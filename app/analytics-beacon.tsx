@@ -9,6 +9,8 @@ export function AnalyticsBeacon() {
 
   useEffect(() => {
     const path = window.location.pathname;
+    const referrer = document.referrer;
+    const searchParams = new URLSearchParams(window.location.search);
     
     // Send page view on mount (dedupe handled server-side)
     const sendHit = () => {
@@ -23,7 +25,14 @@ export function AnalyticsBeacon() {
       
       lastHitRef.current[key] = now;
       
-      const data = JSON.stringify({ path });
+      const data = JSON.stringify({ 
+        path,
+        referrer: referrer || undefined,
+        utm_source: searchParams.get('utm_source') || undefined,
+        utm_medium: searchParams.get('utm_medium') || undefined,
+        utm_campaign: searchParams.get('utm_campaign') || undefined,
+        utm_content: searchParams.get('utm_content') || undefined,
+      });
       
       if (navigator.sendBeacon) {
         navigator.sendBeacon('/api/hit', data);

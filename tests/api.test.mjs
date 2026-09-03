@@ -227,3 +227,135 @@ test('x admin endpoints require auth', async () => {
 
   assert.strictEqual(postsResponse.status, 401);
 });
+
+test('hit endpoint captures referrer and utm params', async () => {
+  const { response, data } = await request('/api/hit', {
+    method: 'POST',
+    body: JSON.stringify({
+      path: '/test-attribution',
+      referrer: 'https://x.com/someuser',
+      utm_source: 'x',
+      utm_medium: 'social',
+      utm_campaign: 'launch',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+});
+
+test('referrer normalization works', async () => {
+  // Test various referrer sources
+  const testCases = [
+    { referrer: 'https://t.co/abc123', expected: 'x' },
+    { referrer: 'https://twitter.com/user', expected: 'x' },
+    { referrer: 'https://google.com/search', expected: 'google' },
+    { referrer: 'https://news.ycombinator.com/item?id=123', expected: 'hn' },
+    { referrer: 'https://reddit.com/r/test', expected: 'reddit' },
+  ];
+
+  for (const testCase of testCases) {
+    const { response, data } = await request('/api/hit', {
+      method: 'POST',
+      body: JSON.stringify({
+        path: `/test-referrer-${Math.random()}`,
+        referrer: testCase.referrer,
+      }),
+    });
+
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(data.ok, true);
+  }
+});
+
+test('event endpoint records visitor events', async () => {
+  const { response, data } = await request('/api/event', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'click_x',
+      path: '/test-event',
+      meta: { target: 'https://x.com/test' },
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+});
+
+test('event endpoint validates event names', async () => {
+  const { response } = await request('/api/event', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'invalid_event',
+      path: '/test-event',
+    }),
+  });
+
+  assert.strictEqual(response.status, 400);
+});
+
+test('short link creation and redirect', async () => {
+  const slug = `test-${Date.now()}`;
+  
+  // Create link
+  const { response: createResponse, data: createData } = await request('/api/admin/link', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      slug,
+      target: 'https://example.com',
+      utm_source: 'test',
+      utm_campaign: 'test-campaign',
+    }),
+  });
+
+  assert.strictEqual(createResponse.status, 200);
+  assert.strictEqual(createData.ok, true);
+
+  // Follow redirect
+  const { response: redirectResponse } = await request(`/go/${slug}`, {
+    redirect: 'manual',
+  });
+
+  assert.strictEqual(redirectResponse.status, 302);
+  const location = redirectResponse.headers.get('location');
+  assert.ok(location);
+  assert.ok(location.includes('utm_source=test'));
+  assert.ok(location.includes('utm_campaign=test-campaign'));
+});
+
+test('link admin endpoint requires auth', async () => {
+  const { response } = await request('/api/admin/link', {
+    method: 'POST',
+    body: JSON.stringify({
+      slug: 'test',
+      target: 'https://example.com',
+    }),
+  });
+
+  assert.strictEqual(response.status, 401);
+});
+
+test('analytics admin endpoint requires auth', async () => {
+  const { response } = await request('/api/admin/analytics');
+
+  assert.strictEqual(response.status, 401);
+});
+
+test('analytics admin endpoint returns data', async () => {
+  const { response, data } = await request('/api/admin/analytics?days=7', {
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.ok(Array.isArray(data.by_source));
+  assert.ok(Array.isArray(data.by_campaign));
+  assert.ok(Array.isArray(data.by_landing_page));
+  assert.ok(Array.isArray(data.events_by_name));
+  assert.ok(typeof data.funnel === 'object');
+  assert.ok(Array.isArray(data.links));
+});

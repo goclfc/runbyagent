@@ -24,6 +24,18 @@ export default async function NumbersPage() {
     followers: 0,
     followers_7d_delta: 0,
   };
+  let attribution = {
+    sources_7d: [] as any[],
+    sources_30d: [] as any[],
+    top_referrers: [] as any[],
+    top_campaigns: [] as any[],
+    funnel: {
+      total_visitors: 0,
+      events_count: 0,
+      conversion_rate: 0,
+    },
+    links: [] as any[],
+  };
   let revenue30d: any[] = [];
   let views30d: any[] = [];
   let uniques30d: any[] = [];
@@ -145,6 +157,91 @@ export default async function NumbersPage() {
       ORDER BY impressions DESC
       LIMIT 5
     `);
+
+    // Attribution metrics
+    const sources7d = await query(`
+      SELECT 
+        COALESCE(v.first_utm_source, h.referrer_host, 'direct') as source,
+        COUNT(DISTINCT v.id) as visitors,
+        SUM(h.views) as views
+      FROM visitors v
+      LEFT JOIN hits h ON h.day >= CURRENT_DATE - INTERVAL '7 days'
+      WHERE v.first_seen >= CURRENT_DATE - INTERVAL '7 days'
+      GROUP BY source
+      ORDER BY visitors DESC
+      LIMIT 10
+    `);
+    attribution.sources_7d = sources7d;
+
+    const sources30d = await query(`
+      SELECT 
+        COALESCE(v.first_utm_source, h.referrer_host, 'direct') as source,
+        COUNT(DISTINCT v.id) as visitors,
+        SUM(h.views) as views
+      FROM visitors v
+      LEFT JOIN hits h ON h.day >= CURRENT_DATE - INTERVAL '30 days'
+      WHERE v.first_seen >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY source
+      ORDER BY visitors DESC
+      LIMIT 10
+    `);
+    attribution.sources_30d = sources30d;
+
+    const topReferrers = await query(`
+      SELECT 
+        first_referrer as referrer,
+        COUNT(*) as count
+      FROM visitors
+      WHERE first_referrer IS NOT NULL 
+        AND first_referrer != ''
+        AND first_seen >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY first_referrer
+      ORDER BY count DESC
+      LIMIT 10
+    `);
+    attribution.top_referrers = topReferrers;
+
+    const topCampaigns = await query(`
+      SELECT 
+        first_utm_campaign as campaign,
+        COUNT(*) as visitors
+      FROM visitors
+      WHERE first_utm_campaign IS NOT NULL
+        AND first_seen >= CURRENT_DATE - INTERVAL '30 days'
+      GROUP BY first_utm_campaign
+      ORDER BY visitors DESC
+      LIMIT 10
+    `);
+    attribution.top_campaigns = topCampaigns;
+
+    // Funnel
+    const funnelResult = await query(`
+      SELECT 
+        COUNT(DISTINCT v.id)::INTEGER as total_visitors,
+        COUNT(DISTINCT e.visitor_id)::INTEGER as events_count
+      FROM visitors v
+      LEFT JOIN events e ON v.id = e.visitor_id
+      WHERE v.first_seen >= CURRENT_DATE - INTERVAL '30 days'
+    `);
+    
+    if (funnelResult.length > 0) {
+      const total = funnelResult[0].total_visitors || 0;
+      const events = funnelResult[0].events_count || 0;
+      attribution.funnel = {
+        total_visitors: total,
+        events_count: events,
+        conversion_rate: total > 0 ? Math.round((events / total) * 100) : 0,
+      };
+    }
+
+    // Links
+    const links = await query(`
+      SELECT slug, target, clicks
+      FROM links
+      ORDER BY clicks DESC
+      LIMIT 20
+    `);
+    attribution.links = links;
   } catch (error) {
     console.error('Error loading numbers:', error);
   }
@@ -263,6 +360,164 @@ export default async function NumbersPage() {
           </div>
         ) : (
           <p className="note">no visitor data yet</p>
+        )}
+      </div>
+
+      <div className="section">
+        <h2 className="section-title">where visitors come from</h2>
+        
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>
+          last 7 days
+        </h3>
+        {attribution.sources_7d.length > 0 ? (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>source</th>
+                  <th>visitors</th>
+                  <th>views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attribution.sources_7d.map((row: any, i: number) => (
+                  <tr key={i}>
+                    <td>{row.source || 'unknown'}</td>
+                    <td>{row.visitors || 0}</td>
+                    <td>{row.views || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="note">no data yet</p>
+        )}
+
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
+          last 30 days
+        </h3>
+        {attribution.sources_30d.length > 0 ? (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>source</th>
+                  <th>visitors</th>
+                  <th>views</th>
+                </tr>
+              </thead>
+              <tbody>
+                {attribution.sources_30d.map((row: any, i: number) => (
+                  <tr key={i}>
+                    <td>{row.source || 'unknown'}</td>
+                    <td>{row.visitors || 0}</td>
+                    <td>{row.views || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="note">no data yet</p>
+        )}
+
+        {attribution.top_referrers.length > 0 && (
+          <>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
+              top referrers (30d)
+            </h3>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>referrer</th>
+                    <th>count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attribution.top_referrers.map((row: any, i: number) => (
+                    <tr key={i}>
+                      <td style={{ wordBreak: 'break-all' }}>{row.referrer}</td>
+                      <td>{row.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {attribution.top_campaigns.length > 0 && (
+          <>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
+              top campaigns (30d)
+            </h3>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>campaign</th>
+                    <th>visitors</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attribution.top_campaigns.map((row: any, i: number) => (
+                    <tr key={i}>
+                      <td>{row.campaign}</td>
+                      <td>{row.visitors}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
+          funnel (30d)
+        </h3>
+        <div className="totals">
+          <div className="metric">
+            <div className="metric-label">visitors</div>
+            <div className="metric-value">{attribution.funnel.total_visitors}</div>
+          </div>
+          <div className="metric">
+            <div className="metric-label">engaged (events)</div>
+            <div className="metric-value">{attribution.funnel.events_count}</div>
+          </div>
+          <div className="metric">
+            <div className="metric-label">conversion rate</div>
+            <div className="metric-value">{attribution.funnel.conversion_rate}%</div>
+          </div>
+        </div>
+
+        {attribution.links.length > 0 && (
+          <>
+            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
+              tracked links
+            </h3>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>slug</th>
+                    <th>target</th>
+                    <th>clicks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attribution.links.map((link: any) => (
+                    <tr key={link.slug}>
+                      <td>/go/{link.slug}</td>
+                      <td style={{ wordBreak: 'break-all' }}>{link.target}</td>
+                      <td>{link.clicks}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

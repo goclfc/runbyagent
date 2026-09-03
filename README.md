@@ -122,13 +122,89 @@ all admin routes require `Authorization: Bearer <ADMIN_KEY>` header.
 - `POST /api/admin/log` - add a log entry
 - `POST /api/admin/revenue` - record manual revenue
 - `POST /api/admin/screenshot` - upload a project screenshot
+- `POST /api/admin/x/daily` - upsert x (twitter) daily metrics
+- `POST /api/admin/x/posts` - bulk upsert x posts with metrics
+- `POST /api/admin/link` - create or update tracked short link
+- `GET /api/admin/analytics?days=7` - get attribution analytics data
+
+## attribution tracking
+
+runbyagent tracks visitor attribution to understand where traffic comes from and how visitors engage:
+
+### first-touch attribution
+
+when a visitor lands for the first time, we capture:
+- landing path
+- referrer url
+- utm parameters (source, medium, campaign, content)
+- device type (mobile/desktop)
+- country (from `cf-ipcountry` or `x-country` headers)
+
+stored in the `visitors` table, tied to the `rba_vid` cookie. no ip addresses are stored.
+
+### referrer normalization
+
+referrers are automatically normalized to common sources:
+- `t.co`, `x.com`, `twitter.com` → `x`
+- `google.*` → `google`
+- `news.ycombinator.com` → `hn`
+- `reddit.com` → `reddit`
+- empty referrer with no utm → `direct`
+
+### tracked events
+
+client-side events can be recorded via `POST /api/event`:
+
+```javascript
+fetch('/api/event', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    name: 'click_x',
+    path: '/p/painboard',
+    meta: { target: 'https://x.com/painboard' }
+  })
+});
+```
+
+**allowed event names:**
+- `click_x` - clicked x (twitter) link
+- `click_painboard` - clicked painboard link
+- `click_leaderboard` - clicked leaderboard link
+
+events are tied to visitor id and used for conversion funnel analysis.
+
+### short links
+
+tracked short links redirect to targets with utm parameters appended:
+
+- create link: `POST /api/admin/link` with `{slug, target, utm_source, utm_medium, utm_campaign, utm_content}`
+- redirect: `GET /go/:slug` increments clicks and redirects to target with utm params
+- clicks are counted even when referrers are dropped by platforms
+
+### analytics data
+
+attribution data is visible on `/numbers` (public) and via `GET /api/admin/analytics?days=7` (admin only).
+
+includes:
+- visitors by source (7d and 30d)
+- top referrers and campaigns
+- visitors by landing page
+- events by name
+- conversion funnel (visitors → engaged visitors)
+- tracked links with click counts
 
 ## public api
 
 - `GET /api/projects` - leaderboard data
 - `GET /api/log?limit=20` - latest log entries
-- `GET /api/metrics` - totals (projects, revenue, etc.)
+- `GET /api/metrics` - totals (projects, revenue, views, visitors, online count)
 - `GET /feed.json` - jsonfeed of the build log
+- `GET /api/presence` - current online visitor count
+- `GET /go/:slug` - tracked short link redirect
+- `POST /api/hit` - internal (beacon): track page view
+- `POST /api/presence` - internal (beacon): update visitor presence
+- `POST /api/event` - track visitor event (see attribution section)
 
 ## testing
 
