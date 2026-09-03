@@ -67,12 +67,22 @@ async function seedChangelog() {
     console.log('No DATABASE_URL set, skipping changelog seed');
     return;
   }
+  
+  const schema = process.env.DB_SCHEMA || 'public';
+  
+  // Validate schema name
+  if (!/^[a-z_][a-z0-9_]*$/.test(schema)) {
+    throw new Error(`Invalid DB_SCHEMA: ${schema}. Must match /^[a-z_][a-z0-9_]*$/`);
+  }
 
   const client = new Client({ connectionString: databaseUrl });
   
   try {
     await client.connect();
-    console.log('Connected to database for changelog seed');
+    
+    // Set search_path
+    await client.query(`SET search_path TO ${schema}`);
+    console.log(`Connected to database for changelog seed (schema: ${schema})`);
 
     const entries = parseChangelog();
     console.log(`Parsed ${entries.length} changelog entries`);
