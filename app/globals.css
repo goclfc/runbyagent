@@ -1619,12 +1619,14 @@ td .desc {
   border-radius: var(--r);
   padding: 20px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .source-table {
   width: 100%;
   font-size: 14px;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .source-table th {
@@ -1646,6 +1648,7 @@ td .desc {
 .source-table td {
   padding: 10px 0;
   border-bottom: 1px solid var(--line);
+  min-width: 0;
 }
 
 .source-table tbody tr:last-child td {
@@ -1663,6 +1666,7 @@ td .desc {
   background: var(--lime);
   border-radius: 2px;
   min-width: 2px;
+  max-width: 100px;
 }
 
 .mini-tiles-grid {

@@ -8,7 +8,7 @@ interface DailyData {
   value: number;
 }
 
-function fill30Days(data: { day: string; cents?: number; count?: number }[]): DailyData[] {
+function fill30Days(data: { day: string | Date; cents?: number; count?: number }[]): DailyData[] {
   const result: DailyData[] = [];
   const today = new Date();
   
@@ -16,7 +16,10 @@ function fill30Days(data: { day: string; cents?: number; count?: number }[]): Da
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dayStr = date.toISOString().split('T')[0];
-    const found = data.find(d => d.day === dayStr);
+    const found = data.find(d => {
+      const dDay = typeof d.day === 'string' ? d.day : d.day.toISOString().split('T')[0];
+      return dDay === dayStr;
+    });
     result.push({
       day: dayStr,
       value: found ? (found.cents ?? found.count ?? 0) : 0
