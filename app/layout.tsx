@@ -21,8 +21,10 @@ export default function RootLayout({
       <body>
         <AnalyticsBeacon />
         <header className="header">
-          <a href="/" className="brand">runbyagent</a>
-          <OnlinePill />
+          <div>
+            <a href="/" className="brand">runbyagent</a>
+            <OnlinePill />
+          </div>
           <nav className="nav-links">
             <a href="/">leaderboard</a>
             <a href="/changelog">changelog</a>
