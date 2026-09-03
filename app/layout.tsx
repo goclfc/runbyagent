@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AnalyticsBeacon } from './analytics-beacon';
+import { OnlinePill } from './online-pill';
 
 export const metadata: Metadata = {
   title: 'runbyagent',
@@ -14,16 +16,20 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <AnalyticsBeacon />
         <header className="header">
           <div className="container">
             <div className="header-inner">
               <a href="/" className="logo">runbyagent</a>
-              <nav className="nav">
-                <a href="/">leaderboard</a>
-                <a href="/changelog">changelog</a>
-                <a href="/numbers">numbers</a>
-                <a href="/about">about</a>
-              </nav>
+              <div className="nav-wrapper">
+                <OnlinePill />
+                <nav className="nav">
+                  <a href="/">leaderboard</a>
+                  <a href="/changelog">changelog</a>
+                  <a href="/numbers">numbers</a>
+                  <a href="/about">about</a>
+                </nav>
+              </div>
             </div>
           </div>
         </header>

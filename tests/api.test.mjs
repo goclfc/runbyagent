@@ -108,3 +108,122 @@ test('unauthorized admin requests fail', async () => {
 
   assert.strictEqual(response.status, 401);
 });
+
+test('hit endpoint tracks page views', async () => {
+  const { response, data } = await request('/api/hit', {
+    method: 'POST',
+    body: JSON.stringify({
+      path: '/test-page',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+});
+
+test('hit endpoint ignores api routes', async () => {
+  const { response, data } = await request('/api/hit', {
+    method: 'POST',
+    body: JSON.stringify({
+      path: '/api/test',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+});
+
+test('presence endpoint updates heartbeat', async () => {
+  const { response, data } = await request('/api/presence', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+});
+
+test('presence endpoint returns online count', async () => {
+  const { response, data } = await request('/api/presence');
+
+  assert.strictEqual(response.status, 200);
+  assert.ok(typeof data.online === 'number');
+  assert.ok(data.online >= 0);
+});
+
+test('metrics json includes analytics data', async () => {
+  const { response, data } = await request('/api/metrics');
+
+  assert.strictEqual(response.status, 200);
+  assert.ok(typeof data.projects_total === 'number');
+  assert.ok(typeof data.projects_live === 'number');
+  assert.ok(typeof data.revenue_all_time === 'number');
+  assert.ok(typeof data.revenue_30d === 'number');
+  assert.ok(typeof data.views_today === 'number');
+  assert.ok(typeof data.views_total === 'number');
+  assert.ok(typeof data.uniques_today === 'number');
+  assert.ok(typeof data.uniques_total === 'number');
+  assert.ok(typeof data.online === 'number');
+});
+
+test('upsert x daily metrics via admin api', async () => {
+  const today = new Date().toISOString().split('T')[0];
+  const { response, data } = await request('/api/admin/x/daily', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      day: today,
+      followers: 1000,
+      impressions: 50000,
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+});
+
+test('upsert x posts via admin api', async () => {
+  const { response, data } = await request('/api/admin/x/posts', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      posts: [
+        {
+          url: 'https://x.com/test/status/123',
+          text: 'test post',
+          impressions: 1000,
+          likes: 50,
+        },
+      ],
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+  assert.strictEqual(data.count, 1);
+});
+
+test('x admin endpoints require auth', async () => {
+  const { response: dailyResponse } = await request('/api/admin/x/daily', {
+    method: 'POST',
+    body: JSON.stringify({
+      day: '2024-01-01',
+      followers: 100,
+    }),
+  });
+
+  assert.strictEqual(dailyResponse.status, 401);
+
+  const { response: postsResponse } = await request('/api/admin/x/posts', {
+    method: 'POST',
+    body: JSON.stringify({
+      posts: [],
+    }),
+  });
+
+  assert.strictEqual(postsResponse.status, 401);
+});

@@ -97,10 +97,39 @@ a:hover {
   color: var(--color-text);
 }
 
+.nav-wrapper {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
 .nav {
   display: flex;
   gap: var(--space-6);
   font-size: 0.9375rem;
+}
+
+.online-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--radius) / 2);
+  white-space: nowrap;
+}
+
+.online-indicator {
+  color: var(--color-success);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.online-text {
+  line-height: 1;
 }
 
 .hero {
@@ -368,9 +397,26 @@ tbody tr:hover {
     font-size: 1rem;
   }
   
+  .header-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  
+  .nav-wrapper {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    width: 100%;
+  }
+  
   .nav {
     gap: var(--space-4);
     font-size: 0.875rem;
+  }
+  
+  .online-pill {
+    font-size: 0.8125rem;
   }
   
   th, td {
