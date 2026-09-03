@@ -125,18 +125,6 @@ a {
   100% { box-shadow: 0 0 0 0 rgba(200, 255, 61, 0); }
 }
 
-@media (max-width: 600px) {
-  .header {
-    height: auto;
-    flex-wrap: wrap;
-    padding: 16px;
-  }
-  .nav-links {
-    width: 100%;
-    justify-content: flex-start;
-  }
-}
-
 .bento-grid {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
@@ -1353,6 +1341,7 @@ td .desc {
   .header {
     height: 96px;
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: stretch;
     justify-content: flex-start;
     padding: 0;
@@ -1370,7 +1359,7 @@ td .desc {
   }
   
   .nav-links {
-    height: 48px;
+    height: 47px;
     flex-shrink: 0;
     padding: 0 16px;
     overflow-x: auto;
@@ -1449,6 +1438,7 @@ td .desc {
     align-items: center;
     justify-content: space-between;
     text-align: center;
+    grid-column: auto;
   }
   
   .mobile-stats .stat-label {
