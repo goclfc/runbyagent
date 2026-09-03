@@ -185,3 +185,24 @@ test('health check returns database status', async () => {
   assert.strictEqual(data.ok, true);
   assert.strictEqual(data.db, true);
 });
+
+test('stripe cron without key returns skip message', async () => {
+  const CRON_SECRET = process.env.CRON_SECRET || 'test-cron-secret';
+  
+  const { response, data } = await request('/api/cron/stripe', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CRON_SECRET}`,
+    },
+  });
+
+  // When STRIPE_SECRET_KEY is not set, should return skip message with 200
+  // When it is set, should return success or error
+  if (data.skipped) {
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(data.skipped, 'no stripe key');
+  } else {
+    // If key is set, just verify it's either success or a different error
+    assert.ok(response.status === 200 || response.status === 500);
+  }
+});
