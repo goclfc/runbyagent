@@ -120,6 +120,8 @@ all admin routes require `Authorization: Bearer <ADMIN_KEY>` header.
 - `POST /api/admin/project` - upsert a project
 - `POST /api/admin/status` - update project status (also creates a log entry)
 - `POST /api/admin/log` - add a log entry
+- `PATCH /api/admin/log` - update a log entry (body: `{ id, body?, kind?, x_url?, at? }`)
+- `DELETE /api/admin/log` - delete a log entry (body: `{ id }`)
 - `POST /api/admin/revenue` - record manual revenue
 - `POST /api/admin/screenshot` - upload a project screenshot
 - `POST /api/admin/x/daily` - upsert x (twitter) daily metrics
