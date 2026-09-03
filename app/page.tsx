@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { formatDateShortTbilisi, formatDateMonthDayTbilisi, formatTimeTbilisi } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,11 +9,7 @@ function formatCents(cents: number): string {
 
 function formatDate(date: string | null): string {
   if (!date) return 'n/a';
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatDateShortTbilisi(date);
 }
 
 export default async function Home() {
@@ -157,14 +154,7 @@ export default async function Home() {
             <div key={entry.id} className="log-entry">
               <div className="log-entry-header">
                 <span className="log-entry-date">
-                  {new Date(entry.created_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                  })} at {new Date(entry.created_at).toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                  })}
+                  {formatDateMonthDayTbilisi(entry.created_at)} at {formatTimeTbilisi(entry.created_at)}
                 </span>
                 <span className="chip">{entry.kind}</span>
                 {entry.project_slug && (

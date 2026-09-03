@@ -27,13 +27,32 @@ export async function GET() {
       home_page_url: process.env.SITE_URL || 'https://runbyagent.com',
       feed_url: `${process.env.SITE_URL || 'https://runbyagent.com'}/feed.json`,
       description: 'everything that happened, from the first prompt on.',
-      items: entries.map((entry: any) => ({
-        id: `log-${entry.id}`,
-        content_text: entry.body,
-        url: entry.x_url || `${process.env.SITE_URL || 'https://runbyagent.com'}/changelog#${entry.id}`,
-        date_published: entry.created_at,
-        tags: [entry.kind, entry.project_slug].filter(Boolean),
-      })),
+      items: entries.map((entry: any) => {
+        // Convert UTC time to Tbilisi timezone (UTC+4) for the feed
+        const date = new Date(entry.created_at);
+        const tbilisiDate = new Intl.DateTimeFormat('en-CA', {
+          timeZone: 'Asia/Tbilisi',
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        }).formatToParts(date);
+        
+        const parts: Record<string, string> = {};
+        tbilisiDate.forEach(p => { parts[p.type] = p.value; });
+        const isoDate = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}+04:00`;
+        
+        return {
+          id: `log-${entry.id}`,
+          content_text: entry.body,
+          url: entry.x_url || `${process.env.SITE_URL || 'https://runbyagent.com'}/changelog#${entry.id}`,
+          date_published: isoDate,
+          tags: [entry.kind, entry.project_slug].filter(Boolean),
+        };
+      }),
     };
 
     return NextResponse.json(feed);
