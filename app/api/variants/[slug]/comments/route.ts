@@ -1,29 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getOrCreateVisitorId, setVisitorCookie } from '@/lib/visitor';
+import { hashIp, getClientIp, checkRateLimit, incrementRateLimit, verifyDwellTimeToken } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
-
-// Rate limit store (in-memory, per visitor)
-const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
-
-function checkRateLimit(visitorId: string): boolean {
-  const now = Date.now();
-  const limit = rateLimitStore.get(visitorId);
-
-  if (!limit || now > limit.resetAt) {
-    // Reset the limit every hour
-    rateLimitStore.set(visitorId, { count: 1, resetAt: now + 60 * 60 * 1000 });
-    return true;
-  }
-
-  if (limit.count >= 10) {
-    return false;
-  }
-
-  limit.count++;
-  return true;
-}
 
 export async function GET(
   request: NextRequest,
@@ -62,7 +42,17 @@ export async function POST(
   try {
     const { slug } = await params;
     const body = await request.json();
-    const { name, body: commentBody } = body;
+    const { name, body: commentBody, website, t0 } = body;
+    
+    // Honeypot check: if website field is filled, silently discard
+    if (website && website.trim().length > 0) {
+      return NextResponse.json({ success: true, id: 0 });
+    }
+    
+    // Dwell time check (required)
+    if (!t0 || !verifyDwellTimeToken(t0, 3)) {
+      return NextResponse.json({ error: 'slow down' }, { status: 400 });
+    }
 
     if (!commentBody || typeof commentBody !== 'string' || commentBody.trim().length === 0) {
       return NextResponse.json({ error: 'body is required' }, { status: 400 });
@@ -72,12 +62,44 @@ export async function POST(
       return NextResponse.json({ error: 'body must be 2000 characters or less' }, { status: 400 });
     }
 
-    // Get or create visitor ID
-    const visitorId = await getOrCreateVisitorId();
+    // IP-based rate limiting
+    const clientIp = getClientIp(request);
+    if (clientIp) {
+      const ipHash = hashIp(clientIp);
+      const allowed = await checkRateLimit([
+        { key: `ip:${ipHash}:comment`, maxCount: 5, windowMinutes: 60 },
+        { key: `ip:${ipHash}:comment_daily`, maxCount: 20, windowMinutes: 1440 }
+      ]);
+      
+      if (!allowed) {
+        return NextResponse.json({ error: 'slow down' }, { status: 429 });
+      }
+    }
 
-    // Check rate limit
-    if (!checkRateLimit(visitorId)) {
-      return NextResponse.json({ error: 'rate limit exceeded' }, { status: 429 });
+    // Get or create visitor ID
+    const { id: visitorId, isNew } = await getOrCreateVisitorId();
+    
+    // Check new visitor cap and increment if needed
+    if (isNew && clientIp) {
+      const ipHash = hashIp(clientIp);
+      const visitorAllowed = await checkRateLimit([
+        { key: `ip:${ipHash}:visitor`, maxCount: 5, windowMinutes: 60 }
+      ]);
+      
+      if (!visitorAllowed) {
+        return NextResponse.json({ error: 'slow down' }, { status: 429 });
+      }
+      
+      await incrementRateLimit(`ip:${ipHash}:visitor`);
+    }
+    
+    // Per-visitor rate limiting (10 per hour)
+    const visitorAllowed = await checkRateLimit([
+      { key: `visitor:${visitorId}:comment`, maxCount: 10, windowMinutes: 60 }
+    ]);
+    
+    if (!visitorAllowed) {
+      return NextResponse.json({ error: 'slow down' }, { status: 429 });
     }
 
     // Get variant
@@ -94,6 +116,14 @@ export async function POST(
        RETURNING id`,
       [variantId, visitorId, name || null, commentBody.trim()]
     );
+    
+    // Increment rate limits after successful insert
+    if (clientIp) {
+      const ipHash = hashIp(clientIp);
+      await incrementRateLimit(`ip:${ipHash}:comment`);
+      await incrementRateLimit(`ip:${ipHash}:comment_daily`);
+    }
+    await incrementRateLimit(`visitor:${visitorId}:comment`);
 
     // Check for milestone
     const totalComments = await query<{ count: number }>('SELECT COUNT(*)::int as count FROM variant_comments');

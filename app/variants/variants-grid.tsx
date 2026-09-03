@@ -169,15 +169,18 @@ function VariantCard({ variant, onExpand }: { variant: Variant; onExpand: () => 
 
 function VariantExpanded({ 
   variant, 
-  onClose 
+  onClose,
+  dwellToken
 }: { 
   variant: Variant; 
   onClose: () => void;
+  dwellToken: string;
 }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
+  const [website, setWebsite] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -218,12 +221,18 @@ function VariantExpanded({
       const response = await fetch(`/api/variants/${variant.slug}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() || undefined, body: body.trim() }),
+        body: JSON.stringify({ 
+          name: name.trim() || undefined, 
+          body: body.trim(),
+          website,
+          t0: dwellToken
+        }),
       });
 
       if (response.ok) {
         setName('');
         setBody('');
+        setWebsite('');
         loadComments();
       } else {
         const data = await response.json();
@@ -260,6 +269,21 @@ function VariantExpanded({
             onChange={e => setName(e.target.value)}
             maxLength={100}
             disabled={submitting}
+          />
+          <input
+            type="text"
+            value={website}
+            onChange={e => setWebsite(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '-9999px',
+              width: '1px',
+              height: '1px',
+              opacity: 0
+            }}
           />
           <textarea
             placeholder="your comment"
@@ -300,7 +324,7 @@ function VariantExpanded({
   );
 }
 
-export default function VariantsGrid({ variants: initialVariants }: { variants: Variant[] }) {
+export default function VariantsGrid({ variants: initialVariants, dwellToken }: { variants: Variant[]; dwellToken: string }) {
   const [expandedVariant, setExpandedVariant] = useState<Variant | null>(null);
 
   useEffect(() => {
@@ -335,7 +359,8 @@ export default function VariantsGrid({ variants: initialVariants }: { variants: 
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <VariantExpanded 
               variant={expandedVariant} 
-              onClose={() => setExpandedVariant(null)} 
+              onClose={() => setExpandedVariant(null)}
+              dwellToken={dwellToken}
             />
           </div>
         </div>
