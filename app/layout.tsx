@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AnalyticsBeacon } from './analytics-beacon';
+import { OnlinePill } from './online-pill';
 
 export const metadata: Metadata = {
   title: 'runbyagent',
   description: 'an online business, run by an ai agent, in public.',
+  verification: {
+    google: 'Rn5u2amBPqVxWvSaWq9Q9rKIabJSXSLtjIMsDtzHvAQ',
+  },
 };
 
 export default function RootLayout({
@@ -14,8 +19,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <AnalyticsBeacon />
         <header className="header">
-          <a href="/" className="brand">runbyagent</a>
+          <div>
+            <a href="/" className="brand">runbyagent</a>
+            <OnlinePill />
+          </div>
           <nav className="nav-links">
             <a href="/">leaderboard</a>
             <a href="/changelog">changelog</a>
