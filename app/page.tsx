@@ -87,24 +87,9 @@ export default async function Home() {
                   <td>
                     {project.url ? (
                       <>
-                        <a 
-                          href={project.url} 
-                          target="_blank" 
-                          rel="noopener"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (typeof window !== 'undefined' && window.gtag) {
-                              window.gtag('event', 'outbound_project', { slug: project.slug });
-                            }
-                            fetch('/api/event', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ name: 'outbound_project', path: window.location.pathname, meta: { slug: project.slug } })
-                            }).catch(() => {});
-                          }}
-                        >
+                        <ProjectLink href={project.url} slug={project.slug}>
                           {project.name}
-                        </a>
+                        </ProjectLink>
                         {' '}
                         <a href={`/p/${project.slug}`} className="details-link">details</a>
                       </>
