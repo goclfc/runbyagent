@@ -265,11 +265,12 @@ h1 {
 }
 
 .stat-tile {
-  grid-column: span 4;
+  grid-column: span 2;
   grid-row: span 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
+  gap: 14px;
   min-height: 0;
 }
 
@@ -504,7 +505,20 @@ td .desc {
 }
 
 .who-tile {
-  grid-column: span 3;
+  grid-column: span 6;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.person-item {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.person-item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .person-item h3 {
@@ -729,6 +743,26 @@ td .desc {
   loading: lazy;
 }
 
+.variant-thumbnail {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.variant-thumbnail iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1200px;
+  height: 900px;
+  transform-origin: 0 0;
+  border: none;
+  pointer-events: none;
+  loading: lazy;
+}
+
 .variant-card-content {
   padding: 16px;
 }
@@ -772,7 +806,7 @@ td .desc {
 .star {
   background: none;
   border: none;
-  font-size: 24px;
+  font-size: 20px;
   color: var(--line-2);
   cursor: pointer;
   transition: color 0.2s;
@@ -784,13 +818,83 @@ td .desc {
   color: var(--lime);
 }
 
-.star:hover {
+.star:hover:not(:disabled) {
   color: var(--lime);
 }
 
 .star:disabled {
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.btn-pick {
+  padding: 8px 18px;
+  background: var(--tile-2);
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-pick:hover:not(:disabled) {
+  border-color: var(--lime);
+  background: var(--lime-dim);
+  color: var(--lime);
+}
+
+.btn-pick.picked {
+  background: var(--lime);
+  border-color: var(--lime);
+  color: #0b0b0c;
+  cursor: default;
+}
+
+.btn-pick:disabled {
+  cursor: default;
+}
+
+.variant-links {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.variant-link {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.variant-link:hover {
+  color: var(--lime);
+}
+
+.variant-link .arrow {
+  margin-left: 4px;
+}
+
+.variant-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.variant-actions .rating-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: auto;
 }
 
 .variant-card-actions {
@@ -825,11 +929,33 @@ td .desc {
 
 .variant-stats {
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 10px;
   margin-top: 12px;
+  margin-bottom: 14px;
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-2);
+}
+
+.variant-stats .chip-new {
+  display: inline-block;
+  padding: 2px 8px;
+  background: var(--lime-dim);
+  color: var(--lime);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.variant-stats .stat-group {
+  white-space: nowrap;
+}
+
+.variant-stats .stat-separator {
+  color: var(--line-2);
 }
 
 .variant-modal {
