@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const stripe = new Stripe(stripeKey, { apiVersion: '2024-12-18.acacia' });
+    const stripe = new Stripe(stripeKey, { apiVersion: '2025-02-24.acacia' });
     
     const thirtyFiveDaysAgo = Math.floor(Date.now() / 1000) - (35 * 24 * 60 * 60);
     
