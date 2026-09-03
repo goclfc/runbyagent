@@ -21,6 +21,7 @@ export default async function Home() {
     revenue_all_time: 0,
     revenue_30d: 0,
   };
+  let recentChangelog: any[] = [];
   let hasStripeKey = false;
 
   try {
@@ -60,6 +61,20 @@ export default async function Home() {
     `);
 
     totals = totalsResult[0] || totals;
+
+    recentChangelog = await query(`
+      SELECT 
+        le.id,
+        le.body,
+        le.kind,
+        le.created_at,
+        p.slug as project_slug,
+        p.name as project_name
+      FROM log_entries le
+      LEFT JOIN projects p ON le.project_id = p.id
+      ORDER BY le.created_at DESC
+      LIMIT 5
+    `);
   } catch (error) {
     console.error('Error loading home page:', error);
   }
@@ -132,6 +147,40 @@ export default async function Home() {
         <p className="note" style={{ marginBottom: 'var(--space-8)' }}>
           stripe not connected yet
         </p>
+      )}
+
+      {recentChangelog.length > 0 && (
+        <div className="section">
+          <h2 className="section-title">latest updates</h2>
+          {recentChangelog.map((entry: any) => (
+            <div key={entry.id} className="log-entry">
+              <div className="log-entry-header">
+                <span className="log-entry-date">
+                  {new Date(entry.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                  })} at {new Date(entry.created_at).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  })}
+                </span>
+                <span className="chip">{entry.kind}</span>
+                {entry.project_slug && (
+                  <a href={`/p/${entry.project_slug}`} className="chip">
+                    {entry.project_name}
+                  </a>
+                )}
+              </div>
+              <div className="log-entry-body">
+                <p>{entry.body.length > 200 ? entry.body.slice(0, 200) + '...' : entry.body}</p>
+              </div>
+            </div>
+          ))}
+          <p style={{ marginTop: 'var(--space-4)' }}>
+            <a href="/changelog">view full changelog →</a>
+          </p>
+        </div>
       )}
 
       <div className="section prose">

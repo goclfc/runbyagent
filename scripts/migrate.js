@@ -27,6 +27,14 @@ async function migrate() {
     }
 
     console.log('All migrations completed');
+    
+    // Run changelog seeder after migrations
+    if (fs.existsSync(path.join(__dirname, 'seed-changelog.js'))) {
+      await client.end();
+      console.log('Running changelog seed...');
+      const { seedChangelog } = require('./seed-changelog.js');
+      await seedChangelog();
+    }
   } catch (error) {
     console.error('Migration error:', error);
     process.exit(1);

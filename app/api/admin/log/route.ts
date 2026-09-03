@@ -11,14 +11,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { project, body: logBody, kind, x_url } = body;
+    const { project, body: logBody, kind, x_url, at } = body;
 
     if (!logBody) {
       return NextResponse.json({ error: 'body is required' }, { status: 400 });
     }
 
     const logKind = kind || 'note';
-    if (!['ship', 'kill', 'numbers', 'note'].includes(logKind)) {
+    if (!['prompt', 'decision', 'build', 'fix', 'post', 'delegate', 'ship', 'kill', 'numbers', 'note'].includes(logKind)) {
       return NextResponse.json({ error: 'invalid kind' }, { status: 400 });
     }
 
@@ -35,10 +35,10 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await query(`
-      INSERT INTO log_entries (project_id, body, kind, x_url)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO log_entries (project_id, body, kind, x_url, created_at)
+      VALUES ($1, $2, $3, $4, ${at ? '$5' : 'NOW()'})
       RETURNING *
-    `, [projectId, logBody, logKind, x_url]);
+    `, at ? [projectId, logBody, logKind, x_url, at] : [projectId, logBody, logKind, x_url]);
 
     return NextResponse.json(result[0]);
   } catch (error) {

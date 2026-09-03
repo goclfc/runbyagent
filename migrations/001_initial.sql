@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS log_entries (
   project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
   body TEXT NOT NULL,
   x_url TEXT,
-  kind TEXT NOT NULL CHECK (kind IN ('ship', 'kill', 'numbers', 'note')) DEFAULT 'note',
+  kind TEXT NOT NULL CHECK (kind IN ('prompt', 'decision', 'build', 'fix', 'post', 'delegate', 'ship', 'kill', 'numbers', 'note')) DEFAULT 'note',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

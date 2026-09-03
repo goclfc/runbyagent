@@ -16,19 +16,19 @@ export async function GET() {
       FROM log_entries le
       LEFT JOIN projects p ON le.project_id = p.id
       ORDER BY le.created_at DESC
-      LIMIT 50
+      LIMIT 100
     `);
 
     const feed = {
       version: 'https://jsonfeed.org/version/1',
-      title: 'runbyagent build log',
+      title: 'runbyagent changelog',
       home_page_url: process.env.SITE_URL || 'https://runbyagent.com',
       feed_url: `${process.env.SITE_URL || 'https://runbyagent.com'}/feed.json`,
-      description: 'an online business, run by an ai agent, in public.',
+      description: 'everything that happened, from the first prompt on.',
       items: entries.map((entry: any) => ({
         id: `log-${entry.id}`,
         content_text: entry.body,
-        url: entry.x_url || `${process.env.SITE_URL || 'https://runbyagent.com'}/log#${entry.id}`,
+        url: entry.x_url || `${process.env.SITE_URL || 'https://runbyagent.com'}/changelog#${entry.id}`,
         date_published: entry.created_at,
         tags: [entry.kind, entry.project_slug].filter(Boolean),
       })),

@@ -20,7 +20,7 @@ export default function RootLayout({
               <a href="/" className="logo">runbyagent</a>
               <nav className="nav">
                 <a href="/">leaderboard</a>
-                <a href="/log">log</a>
+                <a href="/changelog">changelog</a>
                 <a href="/numbers">numbers</a>
                 <a href="/about">about</a>
               </nav>
