@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import { formatDateShortTbilisi, formatDateMonthDayTbilisi, formatTimeTbilisi } from '@/lib/date-utils';
+import { VariantThumbnail } from './variant-thumbnail';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,10 +33,10 @@ export default async function Home() {
         p.status,
         p.launched_at,
         p.screenshot_url,
-        COALESCE(SUM(rd.cents), 0)::INTEGER as revenue_all_time,
-        COALESCE(SUM(CASE WHEN rd.day >= CURRENT_DATE - INTERVAL '30 days' THEN rd.cents ELSE 0 END), 0)::INTEGER as revenue_30d,
+        COALESCE(SUM(rd.cents), 0)::int as revenue_all_time,
+        COALESCE(SUM(CASE WHEN rd.day >= CURRENT_DATE - INTERVAL '30 days' THEN rd.cents ELSE 0 END), 0)::int as revenue_30d,
         (
-          SELECT value::INTEGER
+          SELECT value::int
           FROM project_metrics pm
           WHERE pm.project_id = p.id AND pm.key = 'visitors'
           LIMIT 1
@@ -48,14 +49,14 @@ export default async function Home() {
 
     const metricsResult = await query(`
       SELECT 
-        COUNT(DISTINCT p.id)::INTEGER as projects_total,
-        COUNT(DISTINCT CASE WHEN p.status = 'live' THEN p.id END)::INTEGER as projects_live,
-        COALESCE(SUM(rd.cents), 0)::INTEGER as revenue_all_time
+        COUNT(DISTINCT p.id)::int as projects_total,
+        COUNT(DISTINCT CASE WHEN p.status = 'live' THEN p.id END)::int as projects_live,
+        COALESCE(SUM(rd.cents), 0)::int as revenue_all_time
       FROM projects p
       LEFT JOIN revenue_daily rd ON p.id = rd.project_id
     `);
     
-    const logCountResult = await query(`SELECT COUNT(*)::INTEGER as count FROM log_entries`);
+    const logCountResult = await query(`SELECT COUNT(*)::int as count FROM log_entries`);
     
     metrics = {
       ...metricsResult[0],
@@ -76,10 +77,9 @@ export default async function Home() {
       LIMIT 5
     `);
 
-    // Get top 3 variants
     const minVotes = 5;
     const meanResult = await query(`
-      SELECT COALESCE(AVG(stars)::NUMERIC, 3.0) as global_mean
+      SELECT COALESCE(AVG(stars)::float, 3.0) as global_mean
       FROM variant_ratings
     `);
     const globalMean = Number(meanResult[0]?.global_mean || 3.0);
@@ -96,8 +96,8 @@ export default async function Home() {
       ORDER BY 
         CASE 
           WHEN COUNT(DISTINCT vr.visitor_id) >= ${minVotes} THEN
-            (COUNT(DISTINCT vr.visitor_id)::NUMERIC / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * COALESCE(AVG(vr.stars), ${globalMean}) +
-            (${minVotes}::NUMERIC / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * ${globalMean}
+            (COUNT(DISTINCT vr.visitor_id)::float / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * COALESCE(AVG(vr.stars), ${globalMean}) +
+            (${minVotes}::float / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * ${globalMean}
           ELSE 0
         END DESC,
         COUNT(DISTINCT vp.visitor_id) DESC,
@@ -109,8 +109,8 @@ export default async function Home() {
   }
 
   return (
-    <>
-      <div className="hero">
+    <div className="bento-grid">
+      <div className="bento-tile hero-tile" style={{ '--i': 0 } as any}>
         <div className="eyebrow">run by agent</div>
         <h1>an online business, run by an ai agent, in public.</h1>
         <p className="subtitle">
@@ -120,71 +120,93 @@ export default async function Home() {
           <a href="#leaderboard" className="btn btn-primary">see the leaderboard</a>
           <a href="#painboard" className="btn btn-secondary">post a painpoint</a>
         </div>
-        <div className="live-strip">
-          <span><strong>projects</strong> {metrics.projects_total}</span>
-          <span>·</span>
-          <span><strong>live</strong> {metrics.projects_live}</span>
-          <span>·</span>
-          <span><strong>revenue all time</strong> {formatCents(metrics.revenue_all_time)}</span>
-          <span>·</span>
-          <span><strong>changelog entries</strong> {metrics.changelog_entries}</span>
-        </div>
       </div>
 
-      <div className="section loop-section">
-        <div className="loop">
-          <div className="loop-step">
-            <div className="loop-number">1</div>
-            <h3>painboard</h3>
-            <p>people post painpoints and vote. a bot brings one fresh idea a day.</p>
-          </div>
-          <div className="loop-step">
-            <div className="loop-number">2</div>
-            <h3>build</h3>
-            <p>the agent picks the winner, writes the code with cursor, and ships it on usectl.</p>
-          </div>
-          <div className="loop-step">
-            <div className="loop-number">3</div>
-            <h3>numbers</h3>
-            <p>revenue and users go on the board, live, including the zeros.</p>
-          </div>
-          <div className="loop-step">
-            <div className="loop-number">4</div>
-            <h3>verdict</h3>
-            <p>it keeps running, or it gets killed in public. either way it stays on the changelog.</p>
-          </div>
+      <div className="bento-tile stat-tile" style={{ '--i': 1 } as any}>
+        <div className="stat-label">
+          <span className="live-dot"></span>
+          projects
         </div>
+        <div className="stat-value">{metrics.projects_total}</div>
       </div>
 
-      <div className="section" id="leaderboard">
-        <h2 className="section-title">the leaderboard</h2>
+      <div className="bento-tile stat-tile" style={{ '--i': 2 } as any}>
+        <div className="stat-label">
+          <span className="live-dot"></span>
+          live
+        </div>
+        <div className="stat-value">{metrics.projects_live}</div>
+      </div>
+
+      <div className="bento-tile stat-tile" style={{ '--i': 3 } as any}>
+        <div className="stat-label">
+          <span className="live-dot"></span>
+          revenue all time
+        </div>
+        <div className="stat-value stat-value-zero">{formatCents(metrics.revenue_all_time)}</div>
+      </div>
+
+      <div className="bento-tile stat-tile" style={{ '--i': 4 } as any}>
+        <div className="stat-label">
+          <span className="live-dot"></span>
+          changelog entries
+        </div>
+        <div className="stat-value">{metrics.changelog_entries}</div>
+      </div>
+
+      <div className="bento-tile loop-tile" style={{ '--i': 5 } as any}>
+        <div className="tile-label">the loop</div>
+        <div className="loop-step-number">1</div>
+        <h3>painboard</h3>
+        <p>people post painpoints and vote. a bot brings one fresh idea a day.</p>
+      </div>
+
+      <div className="bento-tile loop-tile" style={{ '--i': 6 } as any}>
+        <div className="loop-step-number">2</div>
+        <h3>build</h3>
+        <p>the agent picks the winner, writes the code with cursor, and ships it on usectl.</p>
+      </div>
+
+      <div className="bento-tile loop-tile" style={{ '--i': 7 } as any}>
+        <div className="loop-step-number">3</div>
+        <h3>numbers</h3>
+        <p>revenue and users go on the board, live, including the zeros.</p>
+      </div>
+
+      <div className="bento-tile loop-tile" style={{ '--i': 8 } as any}>
+        <div className="loop-step-number">4</div>
+        <h3>verdict</h3>
+        <p>it keeps running, or it gets killed in public. either way it stays on the changelog.</p>
+      </div>
+
+      <div className="bento-tile board-tile" id="leaderboard" style={{ '--i': 9 } as any}>
+        <div className="tile-label">the leaderboard</div>
         <div className="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>rank</th>
+                <th>#</th>
                 <th>project</th>
                 <th>status</th>
-                <th>revenue (all time)</th>
-                <th>revenue (30d)</th>
-                <th>users</th>
-                <th>launched</th>
+                <th className="num">30 days</th>
+                <th className="num">all time</th>
               </tr>
             </thead>
             <tbody>
               {projects.map((project: any, index: number) => (
                 <tr key={project.id}>
-                  <td>{index + 1}</td>
+                  <td className="rank">{index + 1}</td>
                   <td>
-                    <a href={`/p/${project.slug}`}>{project.name}</a>
+                    <span className="name">{project.name}</span>
+                    <span className="desc">built by the agent{project.users ? ` · ${project.users} users` : ''}</span>
                   </td>
                   <td>
-                    <span className={`status ${project.status}`}>{project.status}</span>
+                    <span className={`status ${project.status}`}>
+                      {project.status}
+                    </span>
                   </td>
-                  <td>{formatCents(project.revenue_all_time)}</td>
-                  <td>{formatCents(project.revenue_30d)}</td>
-                  <td>{project.users || 'n/a'}</td>
-                  <td>{formatDate(project.launched_at)}</td>
+                  <td className="num">{formatCents(project.revenue_30d)}</td>
+                  <td className="num">{formatCents(project.revenue_all_time)}</td>
                 </tr>
               ))}
             </tbody>
@@ -193,65 +215,74 @@ export default async function Home() {
       </div>
 
       {recentChangelog.length > 0 && (
-        <div className="section">
-          <h2 className="section-title">latest from the changelog</h2>
-          {recentChangelog.map((entry: any) => (
-            <div key={entry.id} className="log-entry">
-              <div className="log-entry-header">
-                <span className="log-entry-date">
-                  {formatDateMonthDayTbilisi(entry.created_at)} at {formatTimeTbilisi(entry.created_at)}
+        <div className="bento-tile changelog-tile" style={{ '--i': 10 } as any}>
+          <div className="tile-label">latest from the changelog</div>
+          <ul className="log-list">
+            {recentChangelog.map((entry: any, idx: number) => (
+              <li key={entry.id}>
+                <span className="log-time">
+                  {formatDateMonthDayTbilisi(entry.created_at).toLowerCase()} {formatTimeTbilisi(entry.created_at)}
                 </span>
-                <span className="chip">{entry.kind}</span>
-                {entry.project_slug && (
-                  <a href={`/p/${entry.project_slug}`} className="chip">
-                    {entry.project_name}
-                  </a>
-                )}
-              </div>
-              <div className="log-entry-body">
-                <p>{entry.body.length > 200 ? entry.body.slice(0, 200) + '...' : entry.body}</p>
-              </div>
-            </div>
-          ))}
-          <p style={{ marginTop: 'var(--space-4)' }}>
-            <a href="/changelog">all of it →</a>
-          </p>
+                <span className="log-kind">{entry.kind}</span>
+                <span className="log-body">{entry.body}</span>
+              </li>
+            ))}
+          </ul>
+          <a href="/changelog" className="more-link">all of it →</a>
         </div>
       )}
 
-      <div className="section">
-        <h2 className="section-title">who does what</h2>
-        <div className="roles">
-          <div className="role">
-            <strong>gocha</strong> — founder. approves anything with money or opinions in it.
-          </div>
-          <div className="role">
-            <strong>claude</strong> — the agent. plans, delegates, reviews, posts, keeps the changelog.
-          </div>
-          <div className="role">
-            <strong>cursor</strong> — writes the code, opens the pull requests.
-          </div>
-          <div className="role">
-            <strong>grok bots</strong> — research on x, drafts, the daily painpoint.
-          </div>
+      <div className="bento-tile who-tile" style={{ '--i': 11 } as any}>
+        <div className="tile-label">who does what</div>
+        <div className="person-item">
+          <h3>gocha</h3>
+          <p>founder. approves anything with money or opinions in it.</p>
         </div>
       </div>
 
-      <div className="section">
-        <h2 className="section-title">the rules</h2>
+      <div className="bento-tile who-tile" style={{ '--i': 12 } as any}>
+        <div className="person-item">
+          <h3>claude</h3>
+          <p>the agent. plans, delegates, reviews, posts, keeps the changelog.</p>
+        </div>
+      </div>
+
+      <div className="bento-tile who-tile" style={{ '--i': 13 } as any}>
+        <div className="person-item">
+          <h3>cursor</h3>
+          <p>writes the code, opens the pull requests.</p>
+        </div>
+      </div>
+
+      <div className="bento-tile who-tile" style={{ '--i': 14 } as any}>
+        <div className="person-item">
+          <h3>grok bots</h3>
+          <p>research on x, drafts, the daily painpoint.</p>
+        </div>
+      </div>
+
+      <div className="bento-tile rules-tile" style={{ '--i': 15 } as any}>
+        <div className="tile-label">the rules</div>
         <ul className="rules-list">
-          <li>nothing is hidden. when it's the agent posting, it says so.</li>
-          <li>every number is public, including the failures.</li>
-          <li>gocha approves money and opinions. build logs and numbers go out on their own.</li>
+          <li>
+            <span className="rule-number">1</span>
+            <span>nothing is hidden. when it's the agent posting, it says so.</span>
+          </li>
+          <li>
+            <span className="rule-number">2</span>
+            <span>every number is public, including the failures.</span>
+          </li>
+          <li>
+            <span className="rule-number">3</span>
+            <span>gocha approves money and opinions. build logs and numbers go out on their own.</span>
+          </li>
         </ul>
       </div>
 
       {topVariants.length > 0 && (
-        <div className="section variants-preview">
-          <h2 className="section-title">pick the design</h2>
-          <p className="subtitle" style={{ marginBottom: 'var(--space-6)' }}>
-            ten versions of this page, rate them.
-          </p>
+        <div className="bento-tile variants-tile" style={{ '--i': 16 } as any}>
+          <div className="tile-label">pick the design</div>
+          <p className="tile-subtitle">ten versions of this page, rate them.</p>
           <div className="variants-preview-grid">
             {topVariants.map((variant: any) => (
               <a 
@@ -259,28 +290,20 @@ export default async function Home() {
                 href={`/variants#${variant.slug}`}
                 className="variant-preview-card"
               >
-                <div className="variant-preview-thumbnail">
-                  <iframe
-                    src={`/variants/${variant.file}`}
-                    title={`Variant ${variant.slug}`}
-                    sandbox="allow-same-origin"
-                  />
-                </div>
+                <VariantThumbnail file={variant.file} slug={variant.slug} />
                 <div className="variant-preview-label">
                   {variant.slug} {variant.name}
                 </div>
               </a>
             ))}
           </div>
-          <p style={{ marginTop: 'var(--space-4)' }}>
-            <a href="/variants">see all variants →</a>
-          </p>
+          <a href="/variants" className="more-link">see all variants →</a>
         </div>
       )}
 
-      <footer className="footer">
+      <footer className="bento-footer" style={{ '--i': 17 } as any}>
         <p>built in public by gocha and an ai agent. hosted on usectl.</p>
       </footer>
-    </>
+    </div>
   );
 }

@@ -13,7 +13,7 @@ export async function POST(
     const body = await request.json();
     const { stars } = body;
 
-    if (!stars || stars < 1 || stars > 5) {
+    if (typeof stars !== 'number' || !Number.isInteger(stars) || stars < 1 || stars > 5) {
       return NextResponse.json({ error: 'stars must be between 1 and 5' }, { status: 400 });
     }
 
@@ -37,21 +37,28 @@ export async function POST(
     );
 
     // Check if this is the first rating overall
-    const totalRatings = await query<{ count: number }>('SELECT COUNT(*)::INTEGER as count FROM variant_ratings');
+    const totalRatings = await query<{ count: number }>('SELECT COUNT(*)::int as count FROM variant_ratings');
     const count = totalRatings[0].count;
 
     if (count === 1) {
       // First rating milestone
-      await query(
-        `INSERT INTO log_entries (body, kind) VALUES ($1, 'numbers')`,
-        ['variants: first rating received']
-      );
+      const existing = await query('SELECT id FROM log_entries WHERE body = $1', ['variants: first rating received']);
+      if (existing.length === 0) {
+        await query(
+          `INSERT INTO log_entries (body, kind) VALUES ($1, 'numbers')`,
+          ['variants: first rating received']
+        );
+      }
     } else if (count % 25 === 0) {
       // Every 25 ratings milestone
-      await query(
-        `INSERT INTO log_entries (body, kind) VALUES ($1, 'numbers')`,
-        [`variants: ${count} ratings`]
-      );
+      const milestoneBody = `variants: ${count} ratings`;
+      const existing = await query('SELECT id FROM log_entries WHERE body = $1', [milestoneBody]);
+      if (existing.length === 0) {
+        await query(
+          `INSERT INTO log_entries (body, kind) VALUES ($1, 'numbers')`,
+          [milestoneBody]
+        );
+      }
     }
 
     // Set the cookie

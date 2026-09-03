@@ -96,14 +96,18 @@ export async function POST(
     );
 
     // Check for milestone
-    const totalComments = await query<{ count: number }>('SELECT COUNT(*)::INTEGER as count FROM variant_comments');
+    const totalComments = await query<{ count: number }>('SELECT COUNT(*)::int as count FROM variant_comments');
     const count = totalComments[0].count;
 
     if (count % 10 === 0) {
-      await query(
-        `INSERT INTO log_entries (body, kind) VALUES ($1, 'numbers')`,
-        [`variants: ${count} comments`]
-      );
+      const milestoneBody = `variants: ${count} comments`;
+      const existing = await query('SELECT id FROM log_entries WHERE body = $1', [milestoneBody]);
+      if (existing.length === 0) {
+        await query(
+          `INSERT INTO log_entries (body, kind) VALUES ($1, 'numbers')`,
+          [milestoneBody]
+        );
+      }
     }
 
     // Set the cookie

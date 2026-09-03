@@ -21,7 +21,7 @@ export async function GET() {
   try {
     // Calculate global mean rating
     const meanResult = await query<{ global_mean: number }>(`
-      SELECT COALESCE(AVG(stars)::NUMERIC, 3.0) as global_mean
+      SELECT COALESCE(AVG(stars)::float, 3.0) as global_mean
       FROM variant_ratings
     `);
     const globalMean = Number(meanResult[0]?.global_mean || 3.0);
@@ -35,16 +35,16 @@ export async function GET() {
         v.name,
         v.description,
         v.file,
-        AVG(vr.stars)::NUMERIC as avg_stars,
-        COUNT(DISTINCT vr.visitor_id)::INTEGER as rating_count,
-        COUNT(DISTINCT vp.visitor_id)::INTEGER as pick_count,
-        COUNT(DISTINCT vc.id)::INTEGER as comment_count,
+        AVG(vr.stars)::float as avg_stars,
+        COUNT(DISTINCT vr.visitor_id)::int as rating_count,
+        COUNT(DISTINCT vp.visitor_id)::int as pick_count,
+        COUNT(DISTINCT vc.id)::int as comment_count,
         CASE 
           WHEN COUNT(DISTINCT vr.visitor_id) >= ${minVotes} THEN
-            (COUNT(DISTINCT vr.visitor_id)::NUMERIC / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * COALESCE(AVG(vr.stars), ${globalMean}) +
-            (${minVotes}::NUMERIC / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * ${globalMean}
+            (COUNT(DISTINCT vr.visitor_id)::float / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * COALESCE(AVG(vr.stars), ${globalMean}) +
+            (${minVotes}::float / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * ${globalMean}
           ELSE 0
-        END as bayesian_score,
+        END::float as bayesian_score,
         CASE WHEN COUNT(DISTINCT vr.visitor_id) < ${minVotes} THEN TRUE ELSE FALSE END as is_new
       FROM variants v
       LEFT JOIN variant_ratings vr ON v.id = vr.variant_id
