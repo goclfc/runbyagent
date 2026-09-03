@@ -108,3 +108,80 @@ test('unauthorized admin requests fail', async () => {
 
   assert.strictEqual(response.status, 401);
 });
+
+test('update log entry via admin api', async () => {
+  // First create a log entry
+  const { data: created } = await request('/api/admin/log', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'original log entry',
+      kind: 'note',
+    }),
+  });
+
+  // Then update it
+  const { response, data } = await request(`/api/admin/log/${created.id}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'updated log entry',
+      kind: 'build',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.id, created.id);
+  assert.strictEqual(data.body, 'updated log entry');
+  assert.strictEqual(data.kind, 'build');
+});
+
+test('delete log entry via admin api', async () => {
+  // First create a log entry
+  const { data: created } = await request('/api/admin/log', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'entry to delete',
+      kind: 'note',
+    }),
+  });
+
+  // Then delete it
+  const { response, data } = await request(`/api/admin/log/${created.id}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.deleted, created.id);
+
+  // Verify it's gone by trying to update it
+  const { response: updateResponse } = await request(`/api/admin/log/${created.id}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'should not work',
+    }),
+  });
+
+  assert.strictEqual(updateResponse.status, 404);
+});
+
+test('health check returns database status', async () => {
+  const { response, data } = await request('/api/health');
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+  assert.strictEqual(data.db, true);
+});

@@ -120,11 +120,14 @@ all admin routes require `Authorization: Bearer <ADMIN_KEY>` header.
 - `POST /api/admin/project` - upsert a project
 - `POST /api/admin/status` - update project status (also creates a log entry)
 - `POST /api/admin/log` - add a log entry
+- `PATCH /api/admin/log/:id` - update a log entry
+- `DELETE /api/admin/log/:id` - delete a log entry
 - `POST /api/admin/revenue` - record manual revenue
 - `POST /api/admin/screenshot` - upload a project screenshot
 
 ## public api
 
+- `GET /api/health` - health check (returns database status)
 - `GET /api/projects` - leaderboard data
 - `GET /api/log?limit=20` - latest log entries
 - `GET /api/metrics` - totals (projects, revenue, etc.)
