@@ -5,6 +5,8 @@ import { AnalyticsBeacon } from './analytics-beacon';
 import { OnlinePill } from './online-pill';
 import { SITE_URL } from '@/lib/site';
 
+const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: 'runbyagent',
@@ -54,7 +56,7 @@ export default function RootLayout({
             <a href="/">leaderboard</a>
             <a href="/changelog">changelog</a>
             <a href="/variants">variants</a>
-            <a href="#painboard">painboard</a>
+            <a href={PAINBOARD_URL} target="_blank" rel="noopener noreferrer">painboard</a>
             <a href="https://x.com/gochaberulava" target="_blank" rel="noopener noreferrer">x</a>
           </nav>
         </header>

@@ -96,6 +96,10 @@ export default async function NumbersPage() {
       conversion_rate: 0,
     },
   };
+  let outboundClicks = {
+    total: 0,
+    by_project: [] as any[],
+  };
   let revenue30d: DailyData[] = [];
   let views30d: DailyData[] = [];
   let uniques30d: DailyData[] = [];
@@ -251,6 +255,26 @@ export default async function NumbersPage() {
         conversion_rate: total > 0 ? Math.round((events / total) * 100) : 0,
       };
     }
+
+    const outboundResult = await query(`
+      SELECT 
+        COUNT(*)::INTEGER as total,
+        meta->>'slug' as slug,
+        p.name as project_name
+      FROM events e
+      LEFT JOIN projects p ON p.slug = e.meta->>'slug'
+      WHERE e.name = 'outbound_project'
+      GROUP BY meta->>'slug', p.name
+      ORDER BY total DESC
+    `);
+    
+    if (outboundResult.length > 0) {
+      const totalClicks = outboundResult.reduce((sum: number, row: any) => sum + (row.total || 0), 0);
+      outboundClicks = {
+        total: totalClicks,
+        by_project: outboundResult,
+      };
+    }
   } catch (error) {
     console.error('Error loading numbers:', error);
   }
@@ -385,6 +409,39 @@ export default async function NumbersPage() {
           )}
         </div>
       </div>
+
+      <h2 style={{ fontSize: '24px', fontWeight: '600', marginTop: '48px', marginBottom: '24px' }}>project clickthroughs</h2>
+      
+      {outboundClicks.total > 0 ? (
+        <div className="source-table-wrapper" style={{ marginBottom: '48px' }}>
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '12px', letterSpacing: '0.08em' }}>
+            total clicks to live projects: {outboundClicks.total}
+          </div>
+          <table className="source-table">
+            <thead>
+              <tr>
+                <th>project</th>
+                <th className="num">clicks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {outboundClicks.by_project.map((row: any, i: number) => (
+                <tr key={i}>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>{row.project_name || row.slug || 'unknown'}</span>
+                      <div className="source-bar" style={{ width: `${(row.total / outboundClicks.total) * 100}px` }}></div>
+                    </div>
+                  </td>
+                  <td className="num">{row.total || 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="chart-empty" style={{ marginBottom: '48px' }}>no clickthroughs yet</div>
+      )}
 
       <div className="mini-tiles-grid">
         <div className="mini-tile">

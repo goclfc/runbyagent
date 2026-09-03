@@ -3,6 +3,8 @@ import { formatDateShortTbilisi, formatDateMonthDayTbilisi, formatTimeTbilisi } 
 import { formatCents } from '@/lib/format';
 import { DashboardStats } from './dashboard-stats';
 
+const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
+
 export const dynamic = 'force-dynamic';
 
 export default async function Home() {
@@ -16,11 +18,12 @@ export default async function Home() {
         p.slug,
         p.name,
         p.status,
+        p.url,
         COALESCE(SUM(rd.cents), 0)::int as revenue_all_time,
         COALESCE(SUM(CASE WHEN rd.day >= CURRENT_DATE - INTERVAL '30 days' THEN rd.cents ELSE 0 END), 0)::int as revenue_30d
       FROM projects p
       LEFT JOIN revenue_daily rd ON p.id = rd.project_id
-      GROUP BY p.id, p.slug, p.name, p.status
+      GROUP BY p.id, p.slug, p.name, p.status, p.url
       ORDER BY revenue_all_time DESC
     `);
 
@@ -79,7 +82,32 @@ export default async function Home() {
                 <tr key={project.id}>
                   <td className="rank">{index + 1}</td>
                   <td>
-                    <a href={`/p/${project.slug}`}>{project.name}</a>
+                    {project.url ? (
+                      <>
+                        <a 
+                          href={project.url} 
+                          target="_blank" 
+                          rel="noopener"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (typeof window !== 'undefined' && window.gtag) {
+                              window.gtag('event', 'outbound_project', { slug: project.slug });
+                            }
+                            fetch('/api/event', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ name: 'outbound_project', path: window.location.pathname, meta: { slug: project.slug } })
+                            }).catch(() => {});
+                          }}
+                        >
+                          {project.name}
+                        </a>
+                        {' '}
+                        <a href={`/p/${project.slug}`} className="details-link">details</a>
+                      </>
+                    ) : (
+                      <a href={`/p/${project.slug}`}>{project.name}</a>
+                    )}
                   </td>
                   <td>
                     <span className={`status ${project.status}`}>{project.status}</span>
@@ -113,7 +141,7 @@ export default async function Home() {
         <p className="subtitle">every project the agent builds, ranked by the money it makes.</p>
         <div className="hero-actions">
           <a href="/#board" className="btn btn-primary">see the leaderboard</a>
-          <a href="#painboard" className="btn btn-secondary">post a painpoint</a>
+          <a href={PAINBOARD_URL} target="_blank" rel="noopener" className="btn btn-secondary">post a painpoint</a>
         </div>
         <div className="mobile-stats">
           <DashboardStats />
@@ -137,7 +165,32 @@ export default async function Home() {
                 <tr key={project.id}>
                   <td className="rank">{index + 1}</td>
                   <td>
-                    <a href={`/p/${project.slug}`}>{project.name}</a>
+                    {project.url ? (
+                      <>
+                        <a 
+                          href={project.url} 
+                          target="_blank" 
+                          rel="noopener"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (typeof window !== 'undefined' && window.gtag) {
+                              window.gtag('event', 'outbound_project', { slug: project.slug });
+                            }
+                            fetch('/api/event', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ name: 'outbound_project', path: window.location.pathname, meta: { slug: project.slug } })
+                            }).catch(() => {});
+                          }}
+                        >
+                          {project.name}
+                        </a>
+                        {' '}
+                        <a href={`/p/${project.slug}`} className="details-link">details</a>
+                      </>
+                    ) : (
+                      <a href={`/p/${project.slug}`}>{project.name}</a>
+                    )}
                   </td>
                   <td className="num">{formatCents(project.revenue_all_time)}</td>
                 </tr>
