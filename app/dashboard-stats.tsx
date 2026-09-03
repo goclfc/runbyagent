@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { formatCents } from '@/lib/format';
 
 interface Stats {
   projects_total: number;
@@ -8,14 +9,6 @@ interface Stats {
   revenue_all_time: number;
   online: number;
   views_today: number;
-}
-
-function formatCompact(cents: number): string {
-  if (cents === 0) return '$0';
-  if (cents < 100) return `$${cents}`;
-  if (cents < 1000) return `$${Math.floor(cents / 100)}`;
-  if (cents < 100000) return `$${(cents / 100000).toFixed(1)}k`.replace('.0k', 'k');
-  return `$${Math.floor(cents / 100000)}k`;
 }
 
 export function DashboardStats() {
@@ -71,7 +64,7 @@ export function DashboardStats() {
       
       <div className="stat-tile">
         <div className="stat-label">revenue</div>
-        <div className="stat-value">{formatCompact(stats.revenue_all_time)}</div>
+        <div className="stat-value">{formatCents(stats.revenue_all_time)}</div>
       </div>
       
       <div className="stat-tile">

@@ -1,16 +1,9 @@
 import { query } from '@/lib/db';
 import { formatDateShortTbilisi, formatDateMonthDayTbilisi, formatTimeTbilisi } from '@/lib/date-utils';
+import { formatCents } from '@/lib/format';
 import { DashboardStats } from './dashboard-stats';
 
 export const dynamic = 'force-dynamic';
-
-function formatCents(cents: number): string {
-  if (cents === 0) return '$0';
-  if (cents < 100) return `$${cents}`;
-  if (cents < 1000) return `$${Math.floor(cents / 100)}`;
-  if (cents < 100000) return `$${(cents / 100000).toFixed(1)}k`;
-  return `$${Math.floor(cents / 100000)}k`;
-}
 
 export default async function Home() {
   let projects = [];
@@ -106,9 +99,7 @@ export default async function Home() {
           {recentChangelog.map((entry: any) => (
             <li key={entry.id}>
               <span className="log-time">{formatDateMonthDayTbilisi(entry.created_at).toLowerCase()} {formatTimeTbilisi(entry.created_at)}</span>
-              <span className="log-sep">·</span>
               <span className="log-kind">{entry.kind}</span>
-              <span className="log-sep">·</span>
               <span className="log-body">{entry.body.length > 80 ? entry.body.slice(0, 80) + '...' : entry.body}</span>
             </li>
           ))}
@@ -162,9 +153,7 @@ export default async function Home() {
           {recentChangelog.map((entry: any) => (
             <li key={entry.id}>
               <span className="log-time">{formatDateMonthDayTbilisi(entry.created_at).toLowerCase()} {formatTimeTbilisi(entry.created_at)}</span>
-              <span className="log-sep">·</span>
               <span className="log-kind">{entry.kind}</span>
-              <span className="log-sep">·</span>
               <span className="log-body">{entry.body.length > 60 ? entry.body.slice(0, 60) + '...' : entry.body}</span>
             </li>
           ))}
