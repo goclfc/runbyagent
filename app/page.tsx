@@ -1,6 +1,7 @@
 import { query } from '@/lib/db';
 import { formatDateShortTbilisi, formatDateMonthDayTbilisi, formatTimeTbilisi } from '@/lib/date-utils';
 import { VariantThumbnail } from './variant-thumbnail';
+import { getRankedVariants } from '@/lib/variants';
 
 export const dynamic = 'force-dynamic';
 
@@ -77,33 +78,12 @@ export default async function Home() {
       LIMIT 5
     `);
 
-    const minVotes = 5;
-    const meanResult = await query(`
-      SELECT COALESCE(AVG(stars)::float, 3.0) as global_mean
-      FROM variant_ratings
-    `);
-    const globalMean = Number(meanResult[0]?.global_mean || 3.0);
-
-    topVariants = await query(`
-      SELECT 
-        v.slug,
-        v.name,
-        v.file
-      FROM variants v
-      LEFT JOIN variant_ratings vr ON v.id = vr.variant_id
-      LEFT JOIN variant_picks vp ON v.id = vp.variant_id
-      GROUP BY v.id, v.slug, v.name, v.file
-      ORDER BY 
-        CASE 
-          WHEN COUNT(DISTINCT vr.visitor_id) >= ${minVotes} THEN
-            (COUNT(DISTINCT vr.visitor_id)::float / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * COALESCE(AVG(vr.stars), ${globalMean}) +
-            (${minVotes}::float / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * ${globalMean}
-          ELSE 0
-        END DESC,
-        COUNT(DISTINCT vp.visitor_id) DESC,
-        v.slug ASC
-      LIMIT 3
-    `);
+    const allVariants = await getRankedVariants();
+    topVariants = allVariants.slice(0, 3).map(v => ({
+      slug: v.slug,
+      name: v.name,
+      file: v.file,
+    }));
   } catch (error) {
     console.error('Error loading home page:', error);
   }

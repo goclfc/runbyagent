@@ -125,7 +125,7 @@ function VariantCard({ variant, onExpand }: { variant: Variant; onExpand: () => 
         <p className="variant-description">{variant.description}</p>
         <div className="variant-stats">
           <div className="stat">
-            {variant.avg_stars ? variant.avg_stars.toFixed(1) : 'n/a'} ★
+            {variant.avg_stars ? Number(variant.avg_stars).toFixed(1) : 'n/a'} ★
             <span className="stat-label">({variant.rating_count})</span>
           </div>
           <div className="stat">
