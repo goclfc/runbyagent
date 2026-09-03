@@ -2,7 +2,7 @@ import { createHash, createHmac } from 'crypto';
 import { query } from './db';
 import { NextRequest } from 'next/server';
 
-const HASH_SALT = process.env.HASH_SALT || 'default-salt-change-in-production';
+const HASH_SALT = process.env.HASH_SALT || process.env.ADMIN_KEY || 'default-salt-change-in-production';
 
 function getDailySalt(): string {
   const today = new Date().toISOString().split('T')[0];

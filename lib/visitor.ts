@@ -9,18 +9,18 @@ function generateVisitorId(): string {
   return randomBytes(16).toString('hex');
 }
 
-export async function getOrCreateVisitorId(): Promise<string> {
+export async function getOrCreateVisitorId(): Promise<{ id: string; isNew: boolean }> {
   const cookieStore = await cookies();
   const existingId = cookieStore.get(COOKIE_NAME);
   
   if (existingId?.value) {
     await incrementPageView(existingId.value);
-    return existingId.value;
+    return { id: existingId.value, isNew: false };
   }
   
   const newId = generateVisitorId();
   await createVisitorMetadata(newId);
-  return newId;
+  return { id: newId, isNew: true };
 }
 
 export async function setVisitorCookie(visitorId: string): Promise<void> {

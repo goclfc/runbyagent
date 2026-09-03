@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getOrCreateVisitorId, setVisitorCookie, getVisitorMetadata } from '@/lib/visitor';
+import { getOrCreateVisitorId, setVisitorCookie } from '@/lib/visitor';
 import { hashIp, getClientIp, checkRateLimit, incrementRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -12,29 +12,40 @@ export async function POST(
   try {
     const { slug } = await params;
 
-    // Get or create visitor ID
-    const visitorId = await getOrCreateVisitorId();
-    
     // IP-based rate limiting
     const clientIp = getClientIp(request);
     if (clientIp) {
       const ipHash = hashIp(clientIp);
       const allowed = await checkRateLimit([
-        { key: `ip:${ipHash}:visitor`, maxCount: 5, windowMinutes: 60 },
         { key: `ip:${ipHash}:pick`, maxCount: 10, windowMinutes: 60 }
       ]);
       
       if (!allowed) {
         return NextResponse.json({ error: 'slow down' }, { status: 429 });
       }
+    }
+
+    // Get or create visitor ID
+    const { id: visitorId, isNew } = await getOrCreateVisitorId();
+    
+    // Check new visitor cap and increment if needed
+    if (isNew && clientIp) {
+      const ipHash = hashIp(clientIp);
+      const visitorAllowed = await checkRateLimit([
+        { key: `ip:${ipHash}:visitor`, maxCount: 5, windowMinutes: 60 }
+      ]);
       
-      await incrementRateLimit(`ip:${ipHash}:pick`);
-      
-      // Track visitor creation from this IP
-      const visitorMeta = await getVisitorMetadata(visitorId);
-      if (!visitorMeta) {
-        await incrementRateLimit(`ip:${ipHash}:visitor`);
+      if (!visitorAllowed) {
+        return NextResponse.json({ error: 'slow down' }, { status: 429 });
       }
+      
+      await incrementRateLimit(`ip:${ipHash}:visitor`);
+    }
+    
+    // Increment pick limit after checks pass
+    if (clientIp) {
+      const ipHash = hashIp(clientIp);
+      await incrementRateLimit(`ip:${ipHash}:pick`);
     }
 
     // Get variant

@@ -10,9 +10,6 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 
 CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON rate_limits(window_start);
 
--- Add trusted flag to ratings (ratings from new visitors don't count initially)
-ALTER TABLE variant_ratings ADD COLUMN IF NOT EXISTS trusted BOOLEAN NOT NULL DEFAULT TRUE;
-
 -- Add IP hash tracking to picks for deduplication
 CREATE TABLE IF NOT EXISTS variant_pick_ips (
   ip_hash TEXT NOT NULL,

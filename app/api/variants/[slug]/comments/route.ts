@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getOrCreateVisitorId, setVisitorCookie, getVisitorMetadata } from '@/lib/visitor';
+import { getOrCreateVisitorId, setVisitorCookie } from '@/lib/visitor';
 import { hashIp, getClientIp, checkRateLimit, incrementRateLimit, verifyDwellTimeToken } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
@@ -49,11 +49,9 @@ export async function POST(
       return NextResponse.json({ success: true, id: 0 });
     }
     
-    // Dwell time check
-    if (t0) {
-      if (!verifyDwellTimeToken(t0, 3)) {
-        return NextResponse.json({ error: 'slow down' }, { status: 429 });
-      }
+    // Dwell time check (required)
+    if (!t0 || !verifyDwellTimeToken(t0, 3)) {
+      return NextResponse.json({ error: 'slow down' }, { status: 400 });
     }
 
     if (!commentBody || typeof commentBody !== 'string' || commentBody.trim().length === 0) {
@@ -64,15 +62,11 @@ export async function POST(
       return NextResponse.json({ error: 'body must be 2000 characters or less' }, { status: 400 });
     }
 
-    // Get or create visitor ID
-    const visitorId = await getOrCreateVisitorId();
-    
     // IP-based rate limiting
     const clientIp = getClientIp(request);
     if (clientIp) {
       const ipHash = hashIp(clientIp);
       const allowed = await checkRateLimit([
-        { key: `ip:${ipHash}:visitor`, maxCount: 5, windowMinutes: 60 },
         { key: `ip:${ipHash}:comment`, maxCount: 5, windowMinutes: 60 },
         { key: `ip:${ipHash}:comment_daily`, maxCount: 20, windowMinutes: 1440 }
       ]);
@@ -80,12 +74,23 @@ export async function POST(
       if (!allowed) {
         return NextResponse.json({ error: 'slow down' }, { status: 429 });
       }
+    }
+
+    // Get or create visitor ID
+    const { id: visitorId, isNew } = await getOrCreateVisitorId();
+    
+    // Check new visitor cap and increment if needed
+    if (isNew && clientIp) {
+      const ipHash = hashIp(clientIp);
+      const visitorAllowed = await checkRateLimit([
+        { key: `ip:${ipHash}:visitor`, maxCount: 5, windowMinutes: 60 }
+      ]);
       
-      // Track visitor creation from this IP
-      const visitorMeta = await getVisitorMetadata(visitorId);
-      if (!visitorMeta) {
-        await incrementRateLimit(`ip:${ipHash}:visitor`);
+      if (!visitorAllowed) {
+        return NextResponse.json({ error: 'slow down' }, { status: 429 });
       }
+      
+      await incrementRateLimit(`ip:${ipHash}:visitor`);
     }
     
     // Per-visitor rate limiting (10 per hour)
