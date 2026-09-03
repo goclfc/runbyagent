@@ -81,30 +81,35 @@ a {
 }
 
 .header {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  height: 60px;
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  gap: 8px 18px;
-  padding: 10px 6px 18px;
+  justify-content: space-between;
+  padding: 0 clamp(16px, 3vw, 40px);
+  border-bottom: 1px solid var(--line);
   font-family: var(--mono);
   font-size: 12px;
   color: var(--text-2);
+  gap: 18px;
 }
 
 .header .brand {
   color: var(--text);
   font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
 }
 
-.header .brand i {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--lime);
-  animation: ping 2.2s ease-out infinite;
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  list-style: none;
+}
+
+.nav-links a:hover {
+  color: var(--text);
 }
 
 @keyframes ping {
@@ -113,16 +118,16 @@ a {
   100% { box-shadow: 0 0 0 0 rgba(200, 255, 61, 0); }
 }
 
-.nav-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  margin-left: auto;
-  list-style: none;
-}
-
-.nav-links a:hover {
-  color: var(--text);
+@media (max-width: 600px) {
+  .header {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+  .nav-links {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 .bento-grid {
@@ -189,6 +194,7 @@ a {
   gap: 28px;
   padding: 28px;
   background: linear-gradient(180deg, var(--tile-2), var(--tile));
+  min-height: 0;
 }
 
 .eyebrow {
@@ -259,11 +265,12 @@ h1 {
 }
 
 .stat-tile {
-  grid-column: span 3;
+  grid-column: span 4;
+  grid-row: span 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: 130px;
+  min-height: 0;
 }
 
 .stat-label {
@@ -304,10 +311,11 @@ h1 {
 
 .loop-tile {
   grid-column: span 3;
+  grid-row: span 1;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 150px;
+  min-height: 0;
 }
 
 .loop-step-number {
@@ -585,9 +593,11 @@ td .desc {
   top: 0;
   left: 0;
   width: 1200px;
-  transform-origin: top left;
+  height: 900px;
+  transform-origin: 0 0;
   border: none;
   pointer-events: none;
+  loading: lazy;
 }
 
 .variant-preview-label {
@@ -609,12 +619,15 @@ td .desc {
 @media (max-width: 900px) {
   .hero-tile {
     grid-column: span 12;
+    grid-row: span 1;
   }
   .stat-tile {
     grid-column: span 6;
+    grid-row: span 1;
   }
   .loop-tile {
     grid-column: span 6;
+    grid-row: span 1;
   }
   .who-tile {
     grid-column: span 6;
@@ -624,9 +637,11 @@ td .desc {
 @media (max-width: 640px) {
   .stat-tile {
     grid-column: span 12;
+    grid-row: span 1;
   }
   .loop-tile {
     grid-column: span 12;
+    grid-row: span 1;
   }
   .who-tile {
     grid-column: span 12;
@@ -707,9 +722,11 @@ td .desc {
   top: 0;
   left: 0;
   width: 1200px;
-  transform-origin: top left;
+  height: 900px;
+  transform-origin: 0 0;
   border: none;
   pointer-events: none;
+  loading: lazy;
 }
 
 .variant-card-content {

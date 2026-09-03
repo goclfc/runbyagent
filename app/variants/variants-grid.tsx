@@ -63,14 +63,16 @@ function VariantCard({ variant, onExpand }: { variant: Variant; onExpand: () => 
     const updateScale = () => {
       if (!iframeRef.current || !containerRef.current) return;
       const containerWidth = containerRef.current.offsetWidth;
-      const scale = containerWidth / 1200; // Scale from 1200px viewport
+      const scale = containerWidth / 1200;
       iframeRef.current.style.transform = `scale(${scale})`;
-      iframeRef.current.style.height = `${600 / scale}px`;
     };
 
     updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
+    const observer = new ResizeObserver(updateScale);
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+    return () => observer.disconnect();
   }, []);
 
   const handleRate = async (stars: number) => {

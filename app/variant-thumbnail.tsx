@@ -12,7 +12,6 @@ export function VariantThumbnail({ file, slug }: { file: string; slug: string })
       const containerWidth = containerRef.current.offsetWidth;
       const scale = containerWidth / 1200;
       iframeRef.current.style.transform = `scale(${scale})`;
-      iframeRef.current.style.height = `${900 / scale}px`;
     };
 
     updateScale();
@@ -30,6 +29,7 @@ export function VariantThumbnail({ file, slug }: { file: string; slug: string })
         src={`/variants/${file}`}
         title={`Variant ${slug}`}
         sandbox="allow-same-origin"
+        loading="lazy"
       />
     </div>
   );
