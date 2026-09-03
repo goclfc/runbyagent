@@ -390,6 +390,11 @@ td.rank {
   color: var(--muted);
 }
 
+td.project-live {
+  color: var(--text-2);
+  font-size: 13px;
+}
+
 td .name {
   font-weight: 600;
   display: block;

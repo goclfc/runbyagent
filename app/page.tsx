@@ -2,6 +2,7 @@ import { query } from '@/lib/db';
 import { formatDateShortTbilisi, formatDateMonthDayTbilisi, formatTimeTbilisi } from '@/lib/date-utils';
 import { formatCents } from '@/lib/format';
 import { DashboardStats } from './dashboard-stats';
+import { ProjectLiveMetrics } from './project-live-metrics';
 
 const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
 
@@ -73,7 +74,8 @@ export default async function Home() {
                 <th className="col-rank">#</th>
                 <th>project</th>
                 <th>status</th>
-                <th className="num">30d</th>
+                <th className="num">online</th>
+                <th className="num">views today</th>
                 <th className="num">all time</th>
               </tr>
             </thead>
@@ -112,7 +114,7 @@ export default async function Home() {
                   <td>
                     <span className={`status ${project.status}`}>{project.status}</span>
                   </td>
-                  <td className="num">{formatCents(project.revenue_30d)}</td>
+                  <ProjectLiveMetrics slug={project.slug} />
                   <td className="num">{formatCents(project.revenue_all_time)}</td>
                 </tr>
               ))}
