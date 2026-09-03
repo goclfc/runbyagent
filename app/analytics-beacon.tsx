@@ -9,6 +9,12 @@ export function AnalyticsBeacon() {
 
   useEffect(() => {
     const path = window.location.pathname;
+    
+    // Exclude /go/, /api/, and static files
+    if (path.startsWith('/go/') || path.startsWith('/api/') || path.match(/\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot)$/)) {
+      return;
+    }
+    
     const referrer = document.referrer;
     const searchParams = new URLSearchParams(window.location.search);
     

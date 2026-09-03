@@ -36,10 +36,8 @@ export function OnlinePill() {
 
   return (
     <div className="online-pill">
-      <span className="online-indicator">●</span>
-      <span className="online-text">
-        {online} online · {viewsToday} views today
-      </span>
+      <span className="online-dot">●</span>
+      <span>{online} online · {viewsToday.toLocaleString()} views today</span>
     </div>
   );
 }
