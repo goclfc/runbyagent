@@ -131,7 +131,21 @@ all admin routes require `Authorization: Bearer <ADMIN_KEY>` header.
 
 ## attribution tracking
 
-runbyagent tracks visitor attribution to understand where traffic comes from and how visitors engage:
+runbyagent tracks visitor attribution to understand where traffic comes from and how visitors engage.
+
+### dual analytics setup
+
+runbyagent uses both first-party analytics (stored in postgres) and google analytics 4:
+
+- **first-party analytics**: full control, no third-party cookies, stored in our database
+- **google analytics 4**: industry-standard reporting, utm tracking, audience insights
+
+both systems track the same events. custom events are sent to both our `/api/event` endpoint and GA4 when available.
+
+**configure ga4** (optional):
+- set `NEXT_PUBLIC_GA_ID` to your measurement id (defaults to `G-BG0STH000M`)
+- ga4 scripts only load in production (`NODE_ENV=production`)
+- ip anonymization is enabled by default
 
 ### first-touch attribution
 
@@ -155,9 +169,17 @@ referrers are automatically normalized to common sources:
 
 ### tracked events
 
-client-side events can be recorded via `POST /api/event`:
+client-side events can be recorded via `POST /api/event` or using the `sendEvent` helper from `lib/analytics.ts`:
 
 ```javascript
+// using the helper (recommended - sends to both first-party and GA4)
+import { sendEvent } from '@/lib/analytics';
+
+sendEvent('click_x', { target: 'https://x.com/painboard' });
+```
+
+```javascript
+// direct API call (first-party only)
 fetch('/api/event', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
@@ -168,6 +190,8 @@ fetch('/api/event', {
   })
 });
 ```
+
+the helper automatically sends events to both our database and google analytics 4 (when available).
 
 **allowed event names:**
 - `click_x` - clicked x (twitter) link
