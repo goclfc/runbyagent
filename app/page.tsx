@@ -135,7 +135,6 @@ export default async function Home() {
       </div>
 
       <div className="bento-tile loop-tile" style={{ '--i': 5 } as any}>
-        <div className="tile-label">the loop</div>
         <div className="loop-step-number">1</div>
         <h3>painboard</h3>
         <p>people post painpoints and vote. a bot brings one fresh idea a day.</p>
@@ -218,23 +217,14 @@ export default async function Home() {
           <h3>gocha</h3>
           <p>founder. approves anything with money or opinions in it.</p>
         </div>
-      </div>
-
-      <div className="bento-tile who-tile" style={{ '--i': 12 } as any}>
         <div className="person-item">
           <h3>claude</h3>
           <p>the agent. plans, delegates, reviews, posts, keeps the changelog.</p>
         </div>
-      </div>
-
-      <div className="bento-tile who-tile" style={{ '--i': 13 } as any}>
         <div className="person-item">
           <h3>cursor</h3>
           <p>writes the code, opens the pull requests.</p>
         </div>
-      </div>
-
-      <div className="bento-tile who-tile" style={{ '--i': 14 } as any}>
         <div className="person-item">
           <h3>grok bots</h3>
           <p>research on x, drafts, the daily painpoint.</p>
