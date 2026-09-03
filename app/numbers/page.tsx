@@ -1,9 +1,70 @@
 import { query } from '@/lib/db';
+import { formatCents } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+interface DailyData {
+  day: string;
+  value: number;
+}
+
+function fill30Days(data: { day: string | Date; cents?: number; count?: number }[]): DailyData[] {
+  const result: DailyData[] = [];
+  const today = new Date();
+  
+  for (let i = 29; i >= 0; i--) {
+    const date = new Date(today);
+    date.setDate(date.getDate() - i);
+    const dayStr = date.toISOString().split('T')[0];
+    const found = data.find(d => {
+      const dDay = typeof d.day === 'string' ? d.day : d.day.toISOString().split('T')[0];
+      return dDay === dayStr;
+    });
+    result.push({
+      day: dayStr,
+      value: found ? (found.cents ?? found.count ?? 0) : 0
+    });
+  }
+  
+  return result;
+}
+
+function BarChart({ data, label }: { data: DailyData[]; label: string }) {
+  const maxValue = Math.max(...data.map(d => d.value), 1);
+  const hasData = data.some(d => d.value > 0);
+  
+  if (!hasData) {
+    return <div className="chart-empty">nothing yet</div>;
+  }
+  
+  return (
+    <svg className="chart-svg" viewBox="0 0 300 120" preserveAspectRatio="none">
+      {data.map((d, i) => {
+        const height = (d.value / maxValue) * 100;
+        const x = i * 10;
+        const isLast = i === data.length - 1;
+        
+        let displayValue = d.value.toString();
+        if (label === 'revenue') {
+          displayValue = formatCents(d.value);
+        }
+        
+        return (
+          <rect
+            key={i}
+            x={x}
+            y={120 - height}
+            width="9"
+            height={height}
+            fill={isLast ? 'var(--lime)' : 'var(--line-2)'}
+            opacity={isLast ? '1' : '0.6'}
+          >
+            <title>{d.day}: {displayValue}</title>
+          </rect>
+        );
+      })}
+    </svg>
+  );
 }
 
 export default async function NumbersPage() {
@@ -22,26 +83,22 @@ export default async function NumbersPage() {
   };
   let xMetrics = {
     followers: 0,
-    followers_7d_delta: 0,
+    impressions_total: 0,
+    likes_total: 0,
+    replies_total: 0,
   };
   let attribution = {
     sources_7d: [] as any[],
     sources_30d: [] as any[],
-    top_referrers: [] as any[],
-    top_campaigns: [] as any[],
     funnel: {
       total_visitors: 0,
       events_count: 0,
       conversion_rate: 0,
     },
-    links: [] as any[],
   };
-  let revenue30d: any[] = [];
-  let views30d: any[] = [];
-  let uniques30d: any[] = [];
-  let xImpressions7d: any[] = [];
-  let xImpressions30d: any[] = [];
-  let topXPosts: any[] = [];
+  let revenue30d: DailyData[] = [];
+  let views30d: DailyData[] = [];
+  let uniques30d: DailyData[] = [];
 
   try {
     const totalsResult = await query(`
@@ -77,7 +134,7 @@ export default async function NumbersPage() {
       online: parseInt(onlineResult[0]?.count || '0', 10),
     };
 
-    revenue30d = await query(`
+    const revenue30dRaw = await query(`
       SELECT 
         day,
         SUM(cents)::INTEGER as cents
@@ -86,8 +143,9 @@ export default async function NumbersPage() {
       GROUP BY day
       ORDER BY day ASC
     `);
+    revenue30d = fill30Days(revenue30dRaw);
 
-    views30d = await query(`
+    const views30dRaw = await query(`
       SELECT 
         day,
         SUM(views)::INTEGER as count
@@ -96,8 +154,9 @@ export default async function NumbersPage() {
       GROUP BY day
       ORDER BY day ASC
     `);
+    views30d = fill30Days(views30dRaw);
 
-    uniques30d = await query(`
+    const uniques30dRaw = await query(`
       SELECT 
         day,
         COUNT(DISTINCT visitor_id)::INTEGER as count
@@ -106,115 +165,74 @@ export default async function NumbersPage() {
       GROUP BY day
       ORDER BY day ASC
     `);
+    uniques30d = fill30Days(uniques30dRaw);
 
-    // X metrics
     const xFollowersResult = await query(`
-      SELECT 
-        followers,
-        followers - LAG(followers, 7) OVER (ORDER BY day DESC) as followers_7d_delta
+      SELECT followers
       FROM x_daily
       WHERE followers IS NOT NULL
       ORDER BY day DESC
       LIMIT 1
     `);
     
-    if (xFollowersResult.length > 0) {
+    const xTotalsResult = await query(`
+      SELECT 
+        COALESCE(SUM(xd.impressions), 0)::INTEGER as impressions_total,
+        COALESCE(SUM(xp.likes), 0)::INTEGER as likes_total,
+        COALESCE(SUM(xp.replies), 0)::INTEGER as replies_total
+      FROM x_daily xd
+      FULL OUTER JOIN x_posts xp ON 1=1
+    `);
+    
+    if (xFollowersResult.length > 0 || xTotalsResult.length > 0) {
       xMetrics = {
-        followers: xFollowersResult[0].followers || 0,
-        followers_7d_delta: xFollowersResult[0].followers_7d_delta || 0,
+        followers: xFollowersResult[0]?.followers || 0,
+        impressions_total: xTotalsResult[0]?.impressions_total || 0,
+        likes_total: xTotalsResult[0]?.likes_total || 0,
+        replies_total: xTotalsResult[0]?.replies_total || 0,
       };
     }
 
-    xImpressions7d = await query(`
-      SELECT 
-        day,
-        COALESCE(impressions, 0)::INTEGER as impressions
-      FROM x_daily
-      WHERE day >= CURRENT_DATE - INTERVAL '7 days'
-      ORDER BY day ASC
-    `);
-
-    xImpressions30d = await query(`
-      SELECT 
-        day,
-        COALESCE(impressions, 0)::INTEGER as impressions
-      FROM x_daily
-      WHERE day >= CURRENT_DATE - INTERVAL '30 days'
-      ORDER BY day ASC
-    `);
-
-    topXPosts = await query(`
-      SELECT 
-        url,
-        text,
-        impressions,
-        likes,
-        replies,
-        reposts,
-        bookmarks
-      FROM x_posts
-      WHERE impressions IS NOT NULL
-      ORDER BY impressions DESC
-      LIMIT 5
-    `);
-
-    // Attribution metrics
     const sources7d = await query(`
       SELECT 
-        COALESCE(v.first_utm_source, h.referrer_host, 'direct') as source,
-        COUNT(DISTINCT v.id) as visitors,
-        SUM(h.views) as views
+        LOWER(COALESCE(v.first_utm_source, 
+          CASE 
+            WHEN v.first_referrer LIKE '%x.com%' OR v.first_referrer LIKE '%twitter.com%' THEN 'x'
+            WHEN v.first_referrer LIKE '%google.%' THEN 'google'
+            WHEN v.first_referrer IS NOT NULL AND v.first_referrer != '' THEN 'other'
+            ELSE 'direct'
+          END
+        )) as source,
+        COUNT(DISTINCT v.id)::INTEGER as visitors,
+        COALESCE(SUM(h.views), 0)::INTEGER as views
       FROM visitors v
       LEFT JOIN hits h ON h.day >= CURRENT_DATE - INTERVAL '7 days'
       WHERE v.first_seen >= CURRENT_DATE - INTERVAL '7 days'
       GROUP BY source
       ORDER BY visitors DESC
-      LIMIT 10
     `);
     attribution.sources_7d = sources7d;
 
     const sources30d = await query(`
       SELECT 
-        COALESCE(v.first_utm_source, h.referrer_host, 'direct') as source,
-        COUNT(DISTINCT v.id) as visitors,
-        SUM(h.views) as views
+        LOWER(COALESCE(v.first_utm_source, 
+          CASE 
+            WHEN v.first_referrer LIKE '%x.com%' OR v.first_referrer LIKE '%twitter.com%' THEN 'x'
+            WHEN v.first_referrer LIKE '%google.%' THEN 'google'
+            WHEN v.first_referrer IS NOT NULL AND v.first_referrer != '' THEN 'other'
+            ELSE 'direct'
+          END
+        )) as source,
+        COUNT(DISTINCT v.id)::INTEGER as visitors,
+        COALESCE(SUM(h.views), 0)::INTEGER as views
       FROM visitors v
       LEFT JOIN hits h ON h.day >= CURRENT_DATE - INTERVAL '30 days'
       WHERE v.first_seen >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY source
       ORDER BY visitors DESC
-      LIMIT 10
     `);
     attribution.sources_30d = sources30d;
 
-    const topReferrers = await query(`
-      SELECT 
-        first_referrer as referrer,
-        COUNT(*) as count
-      FROM visitors
-      WHERE first_referrer IS NOT NULL 
-        AND first_referrer != ''
-        AND first_seen >= CURRENT_DATE - INTERVAL '30 days'
-      GROUP BY first_referrer
-      ORDER BY count DESC
-      LIMIT 10
-    `);
-    attribution.top_referrers = topReferrers;
-
-    const topCampaigns = await query(`
-      SELECT 
-        first_utm_campaign as campaign,
-        COUNT(*) as visitors
-      FROM visitors
-      WHERE first_utm_campaign IS NOT NULL
-        AND first_seen >= CURRENT_DATE - INTERVAL '30 days'
-      GROUP BY first_utm_campaign
-      ORDER BY visitors DESC
-      LIMIT 10
-    `);
-    attribution.top_campaigns = topCampaigns;
-
-    // Funnel
     const funnelResult = await query(`
       SELECT 
         COUNT(DISTINCT v.id)::INTEGER as total_visitors,
@@ -233,377 +251,186 @@ export default async function NumbersPage() {
         conversion_rate: total > 0 ? Math.round((events / total) * 100) : 0,
       };
     }
-
-    // Links
-    const links = await query(`
-      SELECT slug, target, clicks
-      FROM links
-      ORDER BY clicks DESC
-      LIMIT 20
-    `);
-    attribution.links = links;
   } catch (error) {
     console.error('Error loading numbers:', error);
   }
 
-  const maxRevenue = Math.max(...revenue30d.map(d => d.cents), 1);
-  const maxViews = Math.max(...views30d.map(d => d.count), 1);
-  const maxUniques = Math.max(...uniques30d.map(d => d.count), 1);
-  const maxXImpressions7d = Math.max(...xImpressions7d.map(d => d.impressions), 1);
-  const maxXImpressions30d = Math.max(...xImpressions30d.map(d => d.impressions), 1);
+  const maxVisitors7d = Math.max(...attribution.sources_7d.map(s => s.visitors || 0), 1);
+  const maxVisitors30d = Math.max(...attribution.sources_30d.map(s => s.visitors || 0), 1);
 
   return (
-    <>
-      <div className="hero">
-        <h1>numbers</h1>
-        <p className="subtitle">
-          totals and trends, all in one place.
-        </p>
-      </div>
+    <div className="container">
+      <h1 style={{ fontSize: '38px', fontWeight: '600', marginBottom: '8px' }}>numbers</h1>
+      <p style={{ color: 'var(--text-2)', marginBottom: '32px' }}>all the stats, in one place.</p>
 
-      <div className="section">
-        <h2 className="section-title">business</h2>
-        <div className="totals">
-          <div className="metric">
-            <div className="metric-label">projects</div>
-            <div className="metric-value">{totals.projects_total}</div>
+      <div className="stats-grid">
+        <div className="stat-tile">
+          <div className="stat-label">projects</div>
+          <div className="stat-value">{totals.projects_total}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-label">live</div>
+          <div className="stat-value">{totals.projects_live}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-label">revenue all time</div>
+          <div className="stat-value">{formatCents(totals.revenue_all_time)}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-label">revenue 30d</div>
+          <div className="stat-value">{formatCents(totals.revenue_30d)}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-label">
+            <span className="live-dot"></span>
+            online now
           </div>
-          <div className="metric">
-            <div className="metric-label">live</div>
-            <div className="metric-value">{totals.projects_live}</div>
-          </div>
-          <div className="metric">
-            <div className="metric-label">revenue (all time)</div>
-            <div className="metric-value">{formatCents(totals.revenue_all_time)}</div>
-          </div>
-          <div className="metric">
-            <div className="metric-label">revenue (30d)</div>
-            <div className="metric-value">{formatCents(totals.revenue_30d)}</div>
-          </div>
+          <div className="stat-value">{analytics.online}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-label">views today</div>
+          <div className="stat-value">{analytics.views_today}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-label">views total</div>
+          <div className="stat-value">{analytics.views_total}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-label">visitors today</div>
+          <div className="stat-value">{analytics.uniques_today}</div>
+        </div>
+        <div className="stat-tile">
+          <div className="stat-label">visitors total</div>
+          <div className="stat-value">{analytics.uniques_total}</div>
         </div>
       </div>
 
-      <div className="section">
-        <h2 className="section-title">traffic</h2>
-        <div className="totals">
-          <div className="metric">
-            <div className="metric-label">online now</div>
-            <div className="metric-value">{analytics.online}</div>
-          </div>
-          <div className="metric">
-            <div className="metric-label">views today</div>
-            <div className="metric-value">{analytics.views_today}</div>
-          </div>
-          <div className="metric">
-            <div className="metric-label">views total</div>
-            <div className="metric-value">{analytics.views_total}</div>
-          </div>
-          <div className="metric">
-            <div className="metric-label">visitors today</div>
-            <div className="metric-value">{analytics.uniques_today}</div>
-          </div>
-          <div className="metric">
-            <div className="metric-label">visitors total</div>
-            <div className="metric-value">{analytics.uniques_total}</div>
-          </div>
+      <div className="charts-grid">
+        <div className="chart-tile">
+          <div className="chart-label">revenue (last 30 days)</div>
+          <BarChart data={revenue30d} label="revenue" />
+        </div>
+        <div className="chart-tile">
+          <div className="chart-label">page views (last 30 days)</div>
+          <BarChart data={views30d} label="views" />
+        </div>
+        <div className="chart-tile">
+          <div className="chart-label">unique visitors (last 30 days)</div>
+          <BarChart data={uniques30d} label="visitors" />
         </div>
       </div>
 
-      <div className="section">
-        <h2 className="section-title">revenue (last 30 days)</h2>
-        {revenue30d.length > 0 ? (
-          <div className="chart">
-            {revenue30d.map((day: any) => (
-              <div
-                key={day.day}
-                className="chart-bar"
-                style={{ height: `${(day.cents / maxRevenue) * 100}%` }}
-                title={`${day.day}: ${formatCents(day.cents)}`}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="note">no revenue data yet</p>
-        )}
-      </div>
-
-      <div className="section">
-        <h2 className="section-title">page views (last 30 days)</h2>
-        {views30d.length > 0 ? (
-          <div className="chart">
-            {views30d.map((day: any) => (
-              <div
-                key={day.day}
-                className="chart-bar"
-                style={{ height: `${(day.count / maxViews) * 100}%` }}
-                title={`${day.day}: ${day.count} views`}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="note">no view data yet</p>
-        )}
-      </div>
-
-      <div className="section">
-        <h2 className="section-title">unique visitors (last 30 days)</h2>
-        {uniques30d.length > 0 ? (
-          <div className="chart">
-            {uniques30d.map((day: any) => (
-              <div
-                key={day.day}
-                className="chart-bar"
-                style={{ height: `${(day.count / maxUniques) * 100}%` }}
-                title={`${day.day}: ${day.count} visitors`}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="note">no visitor data yet</p>
-        )}
-      </div>
-
-      <div className="section">
-        <h2 className="section-title">where visitors come from</h2>
-        
-        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>
-          last 7 days
-        </h3>
-        {attribution.sources_7d.length > 0 ? (
-          <div className="table-wrapper">
-            <table>
+      <h2 style={{ fontSize: '24px', fontWeight: '600', marginTop: '48px', marginBottom: '24px' }}>where visitors come from</h2>
+      
+      <div className="sources-grid">
+        <div className="source-table-wrapper">
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '12px', letterSpacing: '0.08em' }}>last 7 days</div>
+          {attribution.sources_7d.length > 0 ? (
+            <table className="source-table">
               <thead>
                 <tr>
                   <th>source</th>
-                  <th>visitors</th>
-                  <th>views</th>
+                  <th className="num">visitors</th>
+                  <th className="num">views</th>
                 </tr>
               </thead>
               <tbody>
                 {attribution.sources_7d.map((row: any, i: number) => (
                   <tr key={i}>
-                    <td>{row.source || 'unknown'}</td>
-                    <td>{row.visitors || 0}</td>
-                    <td>{row.views || 0}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{row.source || 'unknown'}</span>
+                        <div className="source-bar" style={{ width: `${(row.visitors / maxVisitors7d) * 100}px` }}></div>
+                      </div>
+                    </td>
+                    <td className="num">{row.visitors || 0}</td>
+                    <td className="num">{row.views || 0}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        ) : (
-          <p className="note">no data yet</p>
-        )}
+          ) : (
+            <div className="chart-empty">nothing yet</div>
+          )}
+        </div>
 
-        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
-          last 30 days
-        </h3>
-        {attribution.sources_30d.length > 0 ? (
-          <div className="table-wrapper">
-            <table>
+        <div className="source-table-wrapper">
+          <div style={{ fontFamily: 'var(--mono)', fontSize: '11px', color: 'var(--muted)', marginBottom: '12px', letterSpacing: '0.08em' }}>last 30 days</div>
+          {attribution.sources_30d.length > 0 ? (
+            <table className="source-table">
               <thead>
                 <tr>
                   <th>source</th>
-                  <th>visitors</th>
-                  <th>views</th>
+                  <th className="num">visitors</th>
+                  <th className="num">views</th>
                 </tr>
               </thead>
               <tbody>
                 {attribution.sources_30d.map((row: any, i: number) => (
                   <tr key={i}>
-                    <td>{row.source || 'unknown'}</td>
-                    <td>{row.visitors || 0}</td>
-                    <td>{row.views || 0}</td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{row.source || 'unknown'}</span>
+                        <div className="source-bar" style={{ width: `${(row.visitors / maxVisitors30d) * 100}px` }}></div>
+                      </div>
+                    </td>
+                    <td className="num">{row.visitors || 0}</td>
+                    <td className="num">{row.views || 0}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
-        ) : (
-          <p className="note">no data yet</p>
-        )}
-
-        {attribution.top_referrers.length > 0 && (
-          <>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
-              top referrers (30d)
-            </h3>
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>referrer</th>
-                    <th>count</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attribution.top_referrers.map((row: any, i: number) => (
-                    <tr key={i}>
-                      <td style={{ wordBreak: 'break-all' }}>{row.referrer}</td>
-                      <td>{row.count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {attribution.top_campaigns.length > 0 && (
-          <>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
-              top campaigns (30d)
-            </h3>
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>campaign</th>
-                    <th>visitors</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attribution.top_campaigns.map((row: any, i: number) => (
-                    <tr key={i}>
-                      <td>{row.campaign}</td>
-                      <td>{row.visitors}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
-          funnel (30d)
-        </h3>
-        <div className="totals">
-          <div className="metric">
-            <div className="metric-label">visitors</div>
-            <div className="metric-value">{attribution.funnel.total_visitors}</div>
-          </div>
-          <div className="metric">
-            <div className="metric-label">engaged (events)</div>
-            <div className="metric-value">{attribution.funnel.events_count}</div>
-          </div>
-          <div className="metric">
-            <div className="metric-label">conversion rate</div>
-            <div className="metric-value">{attribution.funnel.conversion_rate}%</div>
-          </div>
+          ) : (
+            <div className="chart-empty">nothing yet</div>
+          )}
         </div>
-
-        {attribution.links.length > 0 && (
-          <>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
-              tracked links
-            </h3>
-            <div className="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>slug</th>
-                    <th>target</th>
-                    <th>clicks</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {attribution.links.map((link: any) => (
-                    <tr key={link.slug}>
-                      <td>/go/{link.slug}</td>
-                      <td style={{ wordBreak: 'break-all' }}>{link.target}</td>
-                      <td>{link.clicks}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
       </div>
 
-      <div className="section">
-        <h2 className="section-title">on x</h2>
-        <div className="totals">
-          <div className="metric">
-            <div className="metric-label">followers</div>
-            <div className="metric-value">
-              {xMetrics.followers > 0 ? xMetrics.followers : '-'}
-              {xMetrics.followers_7d_delta !== 0 && (
-                <span style={{ fontSize: '0.875rem', color: 'var(--color-text-secondary)', marginLeft: '0.5rem' }}>
-                  {xMetrics.followers_7d_delta > 0 ? '+' : ''}{xMetrics.followers_7d_delta}
-                </span>
-              )}
+      <div className="mini-tiles-grid">
+        <div className="mini-tile">
+          <div className="tile-label">funnel (30d)</div>
+          <div className="mini-stats">
+            <div>
+              <div className="mini-label">visitors</div>
+              <div className="mini-value">{attribution.funnel.total_visitors}</div>
+            </div>
+            <div>
+              <div className="mini-label">engaged</div>
+              <div className="mini-value">{attribution.funnel.events_count}</div>
+            </div>
+            <div>
+              <div className="mini-label">rate</div>
+              <div className="mini-value">{attribution.funnel.conversion_rate}%</div>
             </div>
           </div>
         </div>
 
-        {xImpressions7d.length > 0 && (
-          <>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
-              impressions (last 7 days)
-            </h3>
-            <div className="chart">
-              {xImpressions7d.map((day: any) => (
-                <div
-                  key={day.day}
-                  className="chart-bar"
-                  style={{ height: `${(day.impressions / maxXImpressions7d) * 100}%` }}
-                  title={`${day.day}: ${day.impressions} impressions`}
-                />
-              ))}
+        <div className="mini-tile">
+          <div className="tile-label">on x</div>
+          <div className="mini-stats">
+            <div>
+              <div className="mini-label">followers</div>
+              <div className="mini-value">{xMetrics.followers > 0 ? xMetrics.followers : '-'}</div>
             </div>
-          </>
-        )}
-
-        {xImpressions30d.length > 0 && (
-          <>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
-              impressions (last 30 days)
-            </h3>
-            <div className="chart">
-              {xImpressions30d.map((day: any) => (
-                <div
-                  key={day.day}
-                  className="chart-bar"
-                  style={{ height: `${(day.impressions / maxXImpressions30d) * 100}%` }}
-                  title={`${day.day}: ${day.impressions} impressions`}
-                />
-              ))}
+            <div>
+              <div className="mini-label">impressions</div>
+              <div className="mini-value">{xMetrics.impressions_total > 0 ? xMetrics.impressions_total.toLocaleString() : '-'}</div>
             </div>
-          </>
-        )}
-
-        {topXPosts.length > 0 && (
-          <>
-            <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginTop: 'var(--space-8)', marginBottom: 'var(--space-4)' }}>
-              top posts
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-              {topXPosts.map((post: any) => (
-                <div key={post.url} className="card">
-                  <p style={{ marginBottom: 'var(--space-3)', color: 'var(--color-text)' }}>
-                    {post.text || '(no text)'}
-                  </p>
-                  <div style={{ display: 'flex', gap: 'var(--space-4)', fontSize: '0.875rem', color: 'var(--color-text-secondary)', flexWrap: 'wrap' }}>
-                    <span>{post.impressions?.toLocaleString() || 0} impressions</span>
-                    <span>{post.likes?.toLocaleString() || 0} likes</span>
-                    <span>{post.replies || 0} replies</span>
-                    <span>{post.reposts || 0} reposts</span>
-                    {post.bookmarks > 0 && <span>{post.bookmarks} bookmarks</span>}
-                    <a href={post.url} target="_blank" rel="noopener noreferrer">view →</a>
-                  </div>
-                </div>
-              ))}
+            <div>
+              <div className="mini-label">likes</div>
+              <div className="mini-value">{xMetrics.likes_total > 0 ? xMetrics.likes_total.toLocaleString() : '-'}</div>
             </div>
-          </>
-        )}
+            <div>
+              <div className="mini-label">replies</div>
+              <div className="mini-value">{xMetrics.replies_total > 0 ? xMetrics.replies_total.toLocaleString() : '-'}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="section">
-        <p>
-          <a href="/api/metrics">view as json →</a>
-        </p>
-      </div>
-    </>
+      <p style={{ marginTop: '48px', fontSize: '14px', color: 'var(--text-2)' }}>
+        <a href="/api/analytics/daily?days=30">view as json →</a>
+      </p>
+    </div>
   );
 }

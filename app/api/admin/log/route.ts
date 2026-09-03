@@ -3,11 +3,14 @@ import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-export async function POST(request: NextRequest) {
+function checkAuth(request: NextRequest): boolean {
   const authHeader = request.headers.get('authorization');
   const expectedAuth = `Bearer ${process.env.ADMIN_KEY}`;
-  
-  if (!authHeader || authHeader !== expectedAuth) {
+  return authHeader === expectedAuth;
+}
+
+export async function POST(request: NextRequest) {
+  if (!checkAuth(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -45,6 +48,97 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result[0]);
   } catch (error) {
     console.error('Error creating log entry:', error);
+    return NextResponse.json({ error: 'internal server error' }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id, body: logBody, kind, x_url, at } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    if (kind && !['prompt', 'decision', 'build', 'fix', 'post', 'delegate', 'ship', 'kill', 'numbers', 'note'].includes(kind)) {
+      return NextResponse.json({ error: 'invalid kind' }, { status: 400 });
+    }
+
+    const updates: string[] = [];
+    const values: any[] = [];
+    let paramCount = 1;
+
+    if (logBody !== undefined) {
+      updates.push(`body = $${paramCount++}`);
+      values.push(logBody);
+    }
+    if (kind !== undefined) {
+      updates.push(`kind = $${paramCount++}`);
+      values.push(kind);
+    }
+    if (x_url !== undefined) {
+      updates.push(`x_url = $${paramCount++}`);
+      values.push(x_url);
+    }
+    if (at !== undefined) {
+      updates.push(`created_at = $${paramCount++}`);
+      values.push(at);
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json({ error: 'no fields to update' }, { status: 400 });
+    }
+
+    values.push(id);
+    const result = await query(`
+      UPDATE log_entries
+      SET ${updates.join(', ')}
+      WHERE id = $${paramCount}
+      RETURNING *
+    `, values);
+
+    if (result.length === 0) {
+      return NextResponse.json({ error: 'not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(result[0]);
+  } catch (error) {
+    console.error('Error updating log entry:', error);
+    return NextResponse.json({ error: 'internal server error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { id } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    }
+
+    const result = await query(`
+      DELETE FROM log_entries
+      WHERE id = $1
+      RETURNING *
+    `, [id]);
+
+    if (result.length === 0) {
+      return NextResponse.json({ error: 'not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(result[0]);
+  } catch (error) {
+    console.error('Error deleting log entry:', error);
     return NextResponse.json({ error: 'internal server error' }, { status: 500 });
   }
 }

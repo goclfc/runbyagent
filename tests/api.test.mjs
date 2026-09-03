@@ -53,6 +53,149 @@ test('add log entry via admin api', async () => {
   assert.strictEqual(data.kind, 'note');
 });
 
+test('update log entry via admin api', async () => {
+  // First create an entry
+  const { data: created } = await request('/api/admin/log', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'original entry',
+      kind: 'note',
+    }),
+  });
+
+  // Update it
+  const { response, data } = await request('/api/admin/log', {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      id: created.id,
+      body: 'updated entry',
+      kind: 'build',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.id, created.id);
+  assert.strictEqual(data.body, 'updated entry');
+  assert.strictEqual(data.kind, 'build');
+});
+
+test('update log entry with partial fields', async () => {
+  // Create an entry
+  const { data: created } = await request('/api/admin/log', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'test entry',
+      kind: 'note',
+      x_url: 'https://x.com/test/status/123',
+    }),
+  });
+
+  // Update only body
+  const { response, data } = await request('/api/admin/log', {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      id: created.id,
+      body: 'modified body',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.body, 'modified body');
+  assert.strictEqual(data.kind, 'note'); // unchanged
+  assert.strictEqual(data.x_url, 'https://x.com/test/status/123'); // unchanged
+});
+
+test('update nonexistent log entry returns 404', async () => {
+  const { response } = await request('/api/admin/log', {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      id: 999999,
+      body: 'should not exist',
+    }),
+  });
+
+  assert.strictEqual(response.status, 404);
+});
+
+test('delete log entry via admin api', async () => {
+  // Create an entry
+  const { data: created } = await request('/api/admin/log', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'entry to delete',
+      kind: 'note',
+    }),
+  });
+
+  // Delete it
+  const { response, data } = await request('/api/admin/log', {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      id: created.id,
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.id, created.id);
+  assert.strictEqual(data.body, 'entry to delete');
+});
+
+test('delete nonexistent log entry returns 404', async () => {
+  const { response } = await request('/api/admin/log', {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      id: 999999,
+    }),
+  });
+
+  assert.strictEqual(response.status, 404);
+});
+
+test('log admin endpoints require auth', async () => {
+  const { response: patchResponse } = await request('/api/admin/log', {
+    method: 'PATCH',
+    body: JSON.stringify({
+      id: 1,
+      body: 'test',
+    }),
+  });
+
+  assert.strictEqual(patchResponse.status, 401);
+
+  const { response: deleteResponse } = await request('/api/admin/log', {
+    method: 'DELETE',
+    body: JSON.stringify({
+      id: 1,
+    }),
+  });
+
+  assert.strictEqual(deleteResponse.status, 401);
+});
+
 test('add manual revenue via admin api', async () => {
   const today = new Date().toISOString().split('T')[0];
   const { response, data } = await request('/api/admin/revenue', {
