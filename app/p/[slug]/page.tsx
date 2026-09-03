@@ -1,6 +1,8 @@
 import { query } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { formatDateShortTbilisi } from '@/lib/date-utils';
+import { ProjectLiveStats } from '@/app/project-live-metrics';
+import { ProjectLink } from '@/app/project-link';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,7 +87,13 @@ export default async function ProjectPage({ params }: PageProps) {
         </div>
         <div className="project-links">
           {project.url && (
-            <a href={project.url} target="_blank" rel="noopener noreferrer">live site →</a>
+            <ProjectLink
+              href={project.url}
+              slug={project.slug}
+              className="project-primary-link"
+            >
+              open {project.name} →
+            </ProjectLink>
           )}
           {project.repo_url && (
             <a href={project.repo_url} target="_blank" rel="noopener noreferrer">repo →</a>
@@ -98,7 +106,20 @@ export default async function ProjectPage({ params }: PageProps) {
 
       <div className="section">
         <h2 className="section-title">numbers</h2>
-        <div className="metrics-grid">
+        <div className="stats-grid">
+          <ProjectLiveStats slug={slug} />
+          <div className="stat-tile">
+            <div className="stat-label">uniques total</div>
+            <div className="stat-value">
+              {metrics.find((m: any) => m.key === 'uniques_total')?.value?.toLocaleString() || '-'}
+            </div>
+          </div>
+          <div className="stat-tile">
+            <div className="stat-label">revenue all time</div>
+            <div className="stat-value">{formatCents(project.revenue_all_time)}</div>
+          </div>
+        </div>
+        <div className="metrics-grid" style={{ marginTop: '24px' }}>
           <div className="metric">
             <div className="metric-label">revenue (all time)</div>
             <div className="metric-value">{formatCents(project.revenue_all_time)}</div>

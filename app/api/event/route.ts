@@ -8,6 +8,7 @@ const ALLOWED_EVENTS = [
   'click_x',
   'click_painboard',
   'click_leaderboard',
+  'outbound_project',
 ];
 
 export async function POST(req: NextRequest) {

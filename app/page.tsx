@@ -2,6 +2,10 @@ import { query } from '@/lib/db';
 import { formatDateShortTbilisi, formatDateMonthDayTbilisi, formatTimeTbilisi } from '@/lib/date-utils';
 import { formatCents } from '@/lib/format';
 import { DashboardStats } from './dashboard-stats';
+import { ProjectLiveMetrics } from './project-live-metrics';
+import { ProjectLink } from './project-link';
+
+const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,11 +20,12 @@ export default async function Home() {
         p.slug,
         p.name,
         p.status,
+        p.url,
         COALESCE(SUM(rd.cents), 0)::int as revenue_all_time,
         COALESCE(SUM(CASE WHEN rd.day >= CURRENT_DATE - INTERVAL '30 days' THEN rd.cents ELSE 0 END), 0)::int as revenue_30d
       FROM projects p
       LEFT JOIN revenue_daily rd ON p.id = rd.project_id
-      GROUP BY p.id, p.slug, p.name, p.status
+      GROUP BY p.id, p.slug, p.name, p.status, p.url
       ORDER BY revenue_all_time DESC
     `);
 
@@ -70,7 +75,8 @@ export default async function Home() {
                 <th className="col-rank">#</th>
                 <th>project</th>
                 <th>status</th>
-                <th className="num">30d</th>
+                <th className="num">online</th>
+                <th className="num">views today</th>
                 <th className="num">all time</th>
               </tr>
             </thead>
@@ -79,12 +85,22 @@ export default async function Home() {
                 <tr key={project.id}>
                   <td className="rank">{index + 1}</td>
                   <td>
-                    <a href={`/p/${project.slug}`}>{project.name}</a>
+                    {project.url ? (
+                      <>
+                        <ProjectLink href={project.url} slug={project.slug}>
+                          {project.name}
+                        </ProjectLink>
+                        {' '}
+                        <a href={`/p/${project.slug}`} className="details-link">details</a>
+                      </>
+                    ) : (
+                      <a href={`/p/${project.slug}`}>{project.name}</a>
+                    )}
                   </td>
                   <td>
                     <span className={`status ${project.status}`}>{project.status}</span>
                   </td>
-                  <td className="num">{formatCents(project.revenue_30d)}</td>
+                  <ProjectLiveMetrics slug={project.slug} />
                   <td className="num">{formatCents(project.revenue_all_time)}</td>
                 </tr>
               ))}
@@ -113,7 +129,7 @@ export default async function Home() {
         <p className="subtitle">every project the agent builds, ranked by the money it makes.</p>
         <div className="hero-actions">
           <a href="/#board" className="btn btn-primary">see the leaderboard</a>
-          <a href="#painboard" className="btn btn-secondary">post a painpoint</a>
+          <a href={PAINBOARD_URL} target="_blank" rel="noopener" className="btn btn-secondary">post a painpoint</a>
         </div>
         <div className="mobile-stats">
           <DashboardStats />
@@ -137,7 +153,17 @@ export default async function Home() {
                 <tr key={project.id}>
                   <td className="rank">{index + 1}</td>
                   <td>
-                    <a href={`/p/${project.slug}`}>{project.name}</a>
+                    {project.url ? (
+                      <>
+                        <ProjectLink href={project.url} slug={project.slug}>
+                          {project.name}
+                        </ProjectLink>
+                        {' '}
+                        <a href={`/p/${project.slug}`} className="details-link">details</a>
+                      </>
+                    ) : (
+                      <a href={`/p/${project.slug}`}>{project.name}</a>
+                    )}
                   </td>
                   <td className="num">{formatCents(project.revenue_all_time)}</td>
                 </tr>
