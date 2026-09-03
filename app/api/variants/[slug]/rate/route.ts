@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getOrCreateVisitorId, setVisitorCookie } from '@/lib/visitor';
+import { hashIp, getClientIp, checkRateLimit, incrementRateLimit } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,41 @@ export async function POST(
       return NextResponse.json({ error: 'stars must be between 1 and 5' }, { status: 400 });
     }
 
+    // IP-based rate limiting
+    const clientIp = getClientIp(request);
+    if (clientIp) {
+      const ipHash = hashIp(clientIp);
+      const allowed = await checkRateLimit([
+        { key: `ip:${ipHash}:rating`, maxCount: 30, windowMinutes: 60 }
+      ]);
+      
+      if (!allowed) {
+        return NextResponse.json({ error: 'slow down' }, { status: 429 });
+      }
+    }
+
     // Get or create visitor ID
-    const visitorId = await getOrCreateVisitorId();
+    const { id: visitorId, isNew } = await getOrCreateVisitorId();
+    
+    // Check new visitor cap and increment if needed
+    if (isNew && clientIp) {
+      const ipHash = hashIp(clientIp);
+      const visitorAllowed = await checkRateLimit([
+        { key: `ip:${ipHash}:visitor`, maxCount: 5, windowMinutes: 60 }
+      ]);
+      
+      if (!visitorAllowed) {
+        return NextResponse.json({ error: 'slow down' }, { status: 429 });
+      }
+      
+      await incrementRateLimit(`ip:${ipHash}:visitor`);
+    }
+    
+    // Increment rating limit after checks pass
+    if (clientIp) {
+      const ipHash = hashIp(clientIp);
+      await incrementRateLimit(`ip:${ipHash}:rating`);
+    }
 
     // Get variant
     const variants = await query<{ id: number }>('SELECT id FROM variants WHERE slug = $1', [slug]);
@@ -27,7 +61,7 @@ export async function POST(
     }
     const variantId = variants[0].id;
 
-    // Upsert rating
+    // Upsert rating (trust is computed at read time based on visitor age)
     await query(
       `INSERT INTO variant_ratings (variant_id, visitor_id, stars)
        VALUES ($1, $2, $3)

@@ -1,0 +1,41 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+
+export async function POST(request: NextRequest) {
+  try {
+    // Check for authorization
+    const authHeader = request.headers.get('authorization');
+    const expectedToken = process.env.ADMIN_TOKEN;
+    
+    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { slug } = body;
+
+    if (!slug || typeof slug !== 'string') {
+      return NextResponse.json({ error: 'slug is required' }, { status: 400 });
+    }
+
+    // Get variant ID
+    const variants = await query<{ id: number }>('SELECT id FROM variants WHERE slug = $1', [slug]);
+    if (variants.length === 0) {
+      return NextResponse.json({ error: 'variant not found' }, { status: 404 });
+    }
+    const variantId = variants[0].id;
+
+    // Delete all ratings, picks, and comments for this variant
+    await query('DELETE FROM variant_ratings WHERE variant_id = $1', [variantId]);
+    await query('DELETE FROM variant_picks WHERE variant_id = $1', [variantId]);
+    await query('DELETE FROM variant_comments WHERE variant_id = $1', [variantId]);
+    await query('DELETE FROM variant_pick_ips WHERE variant_id = $1', [variantId]);
+
+    return NextResponse.json({ success: true, slug, reset: true });
+  } catch (error) {
+    console.error('Error resetting variant:', error);
+    return NextResponse.json({ error: 'internal server error' }, { status: 500 });
+  }
+}

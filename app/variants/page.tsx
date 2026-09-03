@@ -2,6 +2,7 @@ import { query } from '@/lib/db';
 import VariantsGrid from './variants-grid';
 import { getVisitorId } from '@/lib/visitor';
 import { getRankedVariants, type Variant } from '@/lib/variants';
+import { createDwellTimeToken } from '@/lib/rate-limit';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ interface VariantWithUserData extends Variant {
 export default async function VariantsPage() {
   let variants: VariantWithUserData[] = [];
   const visitorId = await getVisitorId();
+  const dwellToken = createDwellTimeToken();
 
   try {
     const baseVariants = await getRankedVariants();
@@ -51,7 +53,7 @@ export default async function VariantsPage() {
           ten versions of this page, same words, different worlds. rate them, pick one, tell us why. the winner becomes the landing.
         </p>
       </div>
-      <VariantsGrid variants={variants} />
+      <VariantsGrid variants={variants} dwellToken={dwellToken.token} />
     </>
   );
 }

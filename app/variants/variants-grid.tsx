@@ -57,22 +57,26 @@ function VariantCard({ variant, onExpand }: { variant: Variant; onExpand: () => 
   const [userPicked, setUserPicked] = useState(variant.user_picked || false);
   const [rating, setRating] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const updateScale = () => {
-      if (!iframeRef.current || !containerRef.current) return;
-      const containerWidth = containerRef.current.offsetWidth;
-      const scale = containerWidth / 1200;
+      if (!iframeRef.current || !boxRef.current) return;
+      const boxWidth = boxRef.current.offsetWidth;
+      const scale = boxWidth / 1200;
       iframeRef.current.style.transform = `scale(${scale})`;
     };
 
     updateScale();
+    window.addEventListener('resize', updateScale);
     const observer = new ResizeObserver(updateScale);
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
+    if (boxRef.current) {
+      observer.observe(boxRef.current);
     }
-    return () => observer.disconnect();
+    return () => {
+      window.removeEventListener('resize', updateScale);
+      observer.disconnect();
+    };
   }, []);
 
   const handleRate = async (stars: number) => {
@@ -108,7 +112,7 @@ function VariantCard({ variant, onExpand }: { variant: Variant; onExpand: () => 
 
   return (
     <div className="variant-card" id={variant.slug}>
-      <div className="variant-thumbnail" ref={containerRef}>
+      <div className="variant-thumbnail" ref={boxRef}>
         <iframe
           ref={iframeRef}
           src={`/variants/${variant.file}`}
@@ -122,37 +126,40 @@ function VariantCard({ variant, onExpand }: { variant: Variant; onExpand: () => 
           <h3>
             <span className="variant-number">{variant.slug}</span> {variant.name}
           </h3>
-          {variant.is_new && <span className="badge">new</span>}
         </div>
         <p className="variant-description">{variant.description}</p>
         <div className="variant-stats">
-          <div className="stat">
-            {variant.avg_stars ? Number(variant.avg_stars).toFixed(1) : 'n/a'} ★
-            <span className="stat-label">({variant.rating_count})</span>
+          {variant.is_new && <span className="chip-new">new</span>}
+          <div className="stat-group">
+            <span>★ {variant.avg_stars ? Number(variant.avg_stars).toFixed(1) : 'n/a'} ({variant.rating_count})</span>
           </div>
-          <div className="stat">
-            {variant.pick_count} <span className="stat-label">picks</span>
+          <span className="stat-separator">·</span>
+          <div className="stat-group">
+            <span>{variant.pick_count} picks</span>
           </div>
-          <div className="stat">
-            {variant.comment_count} <span className="stat-label">comments</span>
+          <span className="stat-separator">·</span>
+          <div className="stat-group">
+            <span>{variant.comment_count} comments</span>
           </div>
         </div>
         <div className="variant-actions">
           <StarRating stars={userStars} onRate={handleRate} disabled={rating} />
+          <span className="rating-count">({variant.rating_count})</span>
           <button
             type="button"
-            className={`btn ${userPicked ? 'btn-picked' : 'btn-secondary'}`}
+            className={`btn-pick ${userPicked ? 'picked' : ''}`}
             onClick={handlePick}
+            disabled={userPicked}
           >
-            {userPicked ? '✓ picked' : 'pick this one'}
+            {userPicked ? 'your pick' : 'pick this one'}
           </button>
         </div>
         <div className="variant-links">
-          <a href={`/variants/${variant.file}`} target="_blank" rel="noopener noreferrer">
-            view full screen →
+          <a href={`/variants/${variant.file}`} target="_blank" rel="noopener noreferrer" className="variant-link">
+            view full screen <span className="arrow">→</span>
           </a>
-          <button type="button" className="link-button" onClick={onExpand}>
-            view comments →
+          <button type="button" className="variant-link" onClick={onExpand}>
+            view comments <span className="arrow">→</span>
           </button>
         </div>
       </div>
@@ -162,15 +169,18 @@ function VariantCard({ variant, onExpand }: { variant: Variant; onExpand: () => 
 
 function VariantExpanded({ 
   variant, 
-  onClose 
+  onClose,
+  dwellToken
 }: { 
   variant: Variant; 
   onClose: () => void;
+  dwellToken: string;
 }) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
+  const [website, setWebsite] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -211,12 +221,18 @@ function VariantExpanded({
       const response = await fetch(`/api/variants/${variant.slug}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() || undefined, body: body.trim() }),
+        body: JSON.stringify({ 
+          name: name.trim() || undefined, 
+          body: body.trim(),
+          website,
+          t0: dwellToken
+        }),
       });
 
       if (response.ok) {
         setName('');
         setBody('');
+        setWebsite('');
         loadComments();
       } else {
         const data = await response.json();
@@ -253,6 +269,21 @@ function VariantExpanded({
             onChange={e => setName(e.target.value)}
             maxLength={100}
             disabled={submitting}
+          />
+          <input
+            type="text"
+            value={website}
+            onChange={e => setWebsite(e.target.value)}
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              left: '-9999px',
+              width: '1px',
+              height: '1px',
+              opacity: 0
+            }}
           />
           <textarea
             placeholder="your comment"
@@ -293,7 +324,7 @@ function VariantExpanded({
   );
 }
 
-export default function VariantsGrid({ variants: initialVariants }: { variants: Variant[] }) {
+export default function VariantsGrid({ variants: initialVariants, dwellToken }: { variants: Variant[]; dwellToken: string }) {
   const [expandedVariant, setExpandedVariant] = useState<Variant | null>(null);
 
   useEffect(() => {
@@ -328,7 +359,8 @@ export default function VariantsGrid({ variants: initialVariants }: { variants: 
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <VariantExpanded 
               variant={expandedVariant} 
-              onClose={() => setExpandedVariant(null)} 
+              onClose={() => setExpandedVariant(null)}
+              dwellToken={dwellToken}
             />
           </div>
         </div>
