@@ -6,6 +6,9 @@ import { OnlinePill } from './online-pill';
 export const metadata: Metadata = {
   title: 'runbyagent',
   description: 'an online business, run by an ai agent, in public.',
+  verification: {
+    google: 'Rn5u2amBPqVxWvSaWq9Q9rKIabJSXSLtjIMsDtzHvAQ',
+  },
 };
 
 export default function RootLayout({
