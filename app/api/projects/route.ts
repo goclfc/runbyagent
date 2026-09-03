@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   try {
     const projects = await query(`
@@ -15,8 +17,7 @@ export async function GET() {
         (
           SELECT value::INTEGER
           FROM project_metrics pm
-          WHERE pm.project_id = p.id AND pm.key IN ('users', 'signups')
-          ORDER BY pm.key
+          WHERE pm.project_id = p.id AND pm.key = 'visitors'
           LIMIT 1
         ) as users
       FROM projects p

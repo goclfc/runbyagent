@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { query } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const expectedAuth = `Bearer ${process.env.ADMIN_KEY}`;

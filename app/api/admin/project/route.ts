@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const expectedAuth = `Bearer ${process.env.ADMIN_KEY}`;

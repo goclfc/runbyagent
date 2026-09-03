@@ -1,5 +1,7 @@
 import { query } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }

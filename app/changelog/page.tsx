@@ -1,5 +1,7 @@
 import { query } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export default async function ChangelogPage() {
   let entries: any[] = [];
 

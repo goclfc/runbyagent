@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
@@ -44,6 +46,7 @@ export async function POST(request: NextRequest) {
           }
         }
         
+        // Record page views if views_total is present
         if (typeof data.views_total === 'number') {
           const today = new Date().toISOString().split('T')[0];
           await query(`
