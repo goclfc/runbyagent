@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import { notFound } from 'next/navigation';
+import { formatDateShortTbilisi } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,11 +145,7 @@ export default async function ProjectPage({ params }: PageProps) {
             <div key={entry.id} className="log-entry">
               <div className="log-entry-header">
                 <span className="log-entry-date">
-                  {new Date(entry.created_at).toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
+                  {formatDateShortTbilisi(entry.created_at)}
                 </span>
                 <span className="chip">{entry.kind}</span>
                 {entry.x_url && (

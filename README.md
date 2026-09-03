@@ -63,9 +63,26 @@ usectl env set ADMIN_KEY=your-secret-admin-key
 usectl env set CRON_SECRET=your-secret-cron-key
 usectl env set STRIPE_SECRET_KEY=sk_test_...
 usectl env set PAINBOARD_URL=https://painboard.example.com
+# optional: set DB_SCHEMA if sharing database with other apps
+usectl env set DB_SCHEMA=runbyagent
 ```
 
 note: `DATABASE_URL` and S3 credentials (`S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`) are auto-injected by usectl. do not set them manually.
+
+### shared database setup
+
+if you're sharing a postgres database with other apps, use `DB_SCHEMA` to isolate tables:
+
+```bash
+usectl env set DB_SCHEMA=runbyagent
+```
+
+this creates and uses a dedicated schema (defaults to `public`). schema names must match `/^[a-z_][a-z0-9_]*$/`.
+
+the migration script:
+- creates the schema if it doesn't exist
+- tracks applied migrations in `_migrations` table (per schema)
+- prevents re-running migrations on subsequent boots
 
 3. deploy:
 

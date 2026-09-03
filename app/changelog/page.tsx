@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+import { getDateKeyTbilisi, formatDateTbilisi, formatTimeTbilisi } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +24,10 @@ export default async function ChangelogPage() {
     console.error('Error loading changelog:', error);
   }
 
-  // Group entries by day
+  // Group entries by day (in Tbilisi timezone)
   const groupedEntries: Record<string, any[]> = {};
   for (const entry of entries) {
-    const date = new Date(entry.created_at).toISOString().split('T')[0];
+    const date = getDateKeyTbilisi(entry.created_at);
     if (!groupedEntries[date]) {
       groupedEntries[date] = [];
     }
@@ -42,27 +43,22 @@ export default async function ChangelogPage() {
         <p className="subtitle">
           everything that happened, from the first prompt on. newest at the bottom.
         </p>
+        <p className="note" style={{ marginTop: 'var(--space-2)' }}>
+          times in tbilisi
+        </p>
       </div>
 
       <div className="section">
         {dates.map((date) => (
           <div key={date} style={{ marginBottom: 'var(--space-8)' }}>
             <h2 className="section-title">
-              {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-              })}
+              {formatDateTbilisi(date + 'T00:00:00Z')}
             </h2>
             {groupedEntries[date].map((entry: any) => (
               <div key={entry.id} className="log-entry" id={entry.id}>
                 <div className="log-entry-header">
                   <span className="log-entry-date">
-                    {new Date(entry.created_at).toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: false,
-                    })}
+                    {formatTimeTbilisi(entry.created_at)}
                   </span>
                   <span className="chip">{entry.kind}</span>
                   {entry.project_slug && (

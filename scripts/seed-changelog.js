@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { Client } = require('pg');
 
 function parseChangelog() {
@@ -67,15 +68,45 @@ async function seedChangelog() {
     console.log('No DATABASE_URL set, skipping changelog seed');
     return;
   }
+  
+  const schema = process.env.DB_SCHEMA || 'public';
+  
+  // Validate schema name
+  if (!/^[a-z_][a-z0-9_]*$/.test(schema)) {
+    throw new Error(`Invalid DB_SCHEMA: ${schema}. Must match /^[a-z_][a-z0-9_]*$/`);
+  }
 
   const client = new Client({ connectionString: databaseUrl });
   
   try {
     await client.connect();
-    console.log('Connected to database for changelog seed');
+    
+    // Set search_path
+    await client.query(`SET search_path TO ${schema}`);
+    console.log(`Connected to database for changelog seed (schema: ${schema})`);
+
+    // Calculate hash of CHANGELOG.md
+    const changelogPath = path.join(__dirname, '../CHANGELOG.md');
+    const changelogContent = fs.readFileSync(changelogPath, 'utf8');
+    const hash = crypto.createHash('sha256').update(changelogContent).digest('hex');
+    const migrationName = `seed-changelog:${hash}`;
+    
+    // Check if this version of the changelog has already been seeded
+    const migrationCheck = await client.query(
+      'SELECT name FROM _migrations WHERE name = $1',
+      [migrationName]
+    );
+    
+    if (migrationCheck.rows.length > 0) {
+      console.log('Changelog already seeded (hash matches), skipping');
+      return;
+    }
 
     const entries = parseChangelog();
     console.log(`Parsed ${entries.length} changelog entries`);
+    
+    let inserted = 0;
+    let skipped = 0;
 
     for (const entry of entries) {
       let projectId = null;
@@ -91,14 +122,32 @@ async function seedChangelog() {
         }
       }
       
+      // Check if entry already exists (dedupe by created_at and body)
+      const existingEntry = await client.query(
+        'SELECT id FROM log_entries WHERE created_at = $1 AND body = $2',
+        [entry.timestamp, entry.text]
+      );
+      
+      if (existingEntry.rows.length > 0) {
+        skipped++;
+        continue;
+      }
+      
       // Insert the entry
       await client.query(
         'INSERT INTO log_entries (body, kind, project_id, created_at) VALUES ($1, $2, $3, $4)',
         [entry.text, entry.kind, projectId, entry.timestamp]
       );
+      inserted++;
     }
 
-    console.log('Changelog entries seeded successfully');
+    // Record this version as seeded
+    await client.query(
+      'INSERT INTO _migrations (name) VALUES ($1)',
+      [migrationName]
+    );
+
+    console.log(`Changelog seed complete: ${inserted} inserted, ${skipped} skipped (already exist)`);
   } catch (error) {
     console.error('Changelog seed error:', error);
     process.exit(1);

@@ -50,15 +50,19 @@ html {
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 body {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a {
   color: var(--color-accent);
   text-decoration: none;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 a:hover {
@@ -69,12 +73,15 @@ a:hover {
   max-width: var(--max-width);
   margin: 0 auto;
   padding: 0 var(--space-4);
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .header {
   border-bottom: 1px solid var(--color-border);
   padding: var(--space-4) 0;
   margin-bottom: var(--space-8);
+  overflow-x: hidden;
 }
 
 .header-inner {
@@ -136,12 +143,14 @@ a:hover {
   overflow-x: auto;
   margin: 0 calc(-1 * var(--space-4));
   padding: 0 var(--space-4);
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9375rem;
+  min-width: 600px;
 }
 
 thead {
@@ -240,6 +249,8 @@ tbody tr:hover {
   gap: var(--space-3);
   margin-bottom: var(--space-2);
   flex-wrap: wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .log-entry-date {
@@ -249,6 +260,8 @@ tbody tr:hover {
 
 .log-entry-body {
   color: var(--color-text);
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .log-entry-body p {
