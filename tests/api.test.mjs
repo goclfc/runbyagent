@@ -108,3 +108,101 @@ test('unauthorized admin requests fail', async () => {
 
   assert.strictEqual(response.status, 401);
 });
+
+test('update log entry via admin api', async () => {
+  // First create a log entry
+  const { data: created } = await request('/api/admin/log', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'original log entry',
+      kind: 'note',
+    }),
+  });
+
+  // Then update it
+  const { response, data } = await request(`/api/admin/log/${created.id}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'updated log entry',
+      kind: 'build',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.id, created.id);
+  assert.strictEqual(data.body, 'updated log entry');
+  assert.strictEqual(data.kind, 'build');
+});
+
+test('delete log entry via admin api', async () => {
+  // First create a log entry
+  const { data: created } = await request('/api/admin/log', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'entry to delete',
+      kind: 'note',
+    }),
+  });
+
+  // Then delete it
+  const { response, data } = await request(`/api/admin/log/${created.id}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.deleted, created.id);
+
+  // Verify it's gone by trying to update it
+  const { response: updateResponse } = await request(`/api/admin/log/${created.id}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      body: 'should not work',
+    }),
+  });
+
+  assert.strictEqual(updateResponse.status, 404);
+});
+
+test('health check returns database status', async () => {
+  const { response, data } = await request('/api/health');
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.ok, true);
+  assert.strictEqual(data.db, true);
+});
+
+test('stripe cron without key returns skip message', async () => {
+  const CRON_SECRET = process.env.CRON_SECRET || 'test-cron-secret';
+  
+  const { response, data } = await request('/api/cron/stripe', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CRON_SECRET}`,
+    },
+  });
+
+  // When STRIPE_SECRET_KEY is not set, should return skip message with 200
+  // When it is set, should return success or error
+  if (data.skipped) {
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(data.skipped, 'no stripe key');
+  } else {
+    // If key is set, just verify it's either success or a different error
+    assert.ok(response.status === 200 || response.status === 500);
+  }
+});

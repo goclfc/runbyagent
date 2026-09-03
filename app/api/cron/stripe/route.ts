@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   
   if (!stripeKey) {
-    return NextResponse.json({ skipped: 'no stripe key' });
+    return NextResponse.json({ skipped: 'no stripe key' }, { status: 200 });
   }
 
   try {
