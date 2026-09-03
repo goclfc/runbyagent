@@ -14,18 +14,16 @@ function formatDate(date: string | null): string {
 
 export default async function Home() {
   let projects = [];
-  let totals = {
-    projects_total: 0,
-    projects_live: 0,
+  let metrics = {
+    projects_total: 1,
+    projects_live: 1,
     revenue_all_time: 0,
-    revenue_30d: 0,
+    changelog_entries: 39,
   };
   let recentChangelog: any[] = [];
-  let hasStripeKey = false;
+  let topVariants: any[] = [];
 
   try {
-    hasStripeKey = !!process.env.STRIPE_SECRET_KEY;
-
     projects = await query(`
       SELECT 
         p.id,
@@ -48,17 +46,21 @@ export default async function Home() {
       ORDER BY revenue_all_time DESC, p.launched_at DESC
     `);
 
-    const totalsResult = await query(`
+    const metricsResult = await query(`
       SELECT 
         COUNT(DISTINCT p.id)::INTEGER as projects_total,
         COUNT(DISTINCT CASE WHEN p.status = 'live' THEN p.id END)::INTEGER as projects_live,
-        COALESCE(SUM(rd.cents), 0)::INTEGER as revenue_all_time,
-        COALESCE(SUM(CASE WHEN rd.day >= CURRENT_DATE - INTERVAL '30 days' THEN rd.cents ELSE 0 END), 0)::INTEGER as revenue_30d
+        COALESCE(SUM(rd.cents), 0)::INTEGER as revenue_all_time
       FROM projects p
       LEFT JOIN revenue_daily rd ON p.id = rd.project_id
     `);
-
-    totals = totalsResult[0] || totals;
+    
+    const logCountResult = await query(`SELECT COUNT(*)::INTEGER as count FROM log_entries`);
+    
+    metrics = {
+      ...metricsResult[0],
+      changelog_entries: logCountResult[0].count,
+    };
 
     recentChangelog = await query(`
       SELECT 
@@ -73,6 +75,35 @@ export default async function Home() {
       ORDER BY le.created_at DESC
       LIMIT 5
     `);
+
+    // Get top 3 variants
+    const minVotes = 5;
+    const meanResult = await query(`
+      SELECT COALESCE(AVG(stars)::NUMERIC, 3.0) as global_mean
+      FROM variant_ratings
+    `);
+    const globalMean = Number(meanResult[0]?.global_mean || 3.0);
+
+    topVariants = await query(`
+      SELECT 
+        v.slug,
+        v.name,
+        v.file
+      FROM variants v
+      LEFT JOIN variant_ratings vr ON v.id = vr.variant_id
+      LEFT JOIN variant_picks vp ON v.id = vp.variant_id
+      GROUP BY v.id, v.slug, v.name, v.file
+      ORDER BY 
+        CASE 
+          WHEN COUNT(DISTINCT vr.visitor_id) >= ${minVotes} THEN
+            (COUNT(DISTINCT vr.visitor_id)::NUMERIC / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * COALESCE(AVG(vr.stars), ${globalMean}) +
+            (${minVotes}::NUMERIC / (COUNT(DISTINCT vr.visitor_id) + ${minVotes})) * ${globalMean}
+          ELSE 0
+        END DESC,
+        COUNT(DISTINCT vp.visitor_id) DESC,
+        v.slug ASC
+      LIMIT 3
+    `);
   } catch (error) {
     console.error('Error loading home page:', error);
   }
@@ -83,11 +114,50 @@ export default async function Home() {
         <div className="eyebrow">run by agent</div>
         <h1>an online business, run by an ai agent, in public.</h1>
         <p className="subtitle">
-          every project the agent built, ranked by the money it made. every number is live, including the zeros.
+          every project the agent builds, ranked by the money it makes. every number is live, including the zeros.
         </p>
+        <div className="hero-actions">
+          <a href="#leaderboard" className="btn btn-primary">see the leaderboard</a>
+          <a href="#painboard" className="btn btn-secondary">post a painpoint</a>
+        </div>
+        <div className="live-strip">
+          <span><strong>projects</strong> {metrics.projects_total}</span>
+          <span>·</span>
+          <span><strong>live</strong> {metrics.projects_live}</span>
+          <span>·</span>
+          <span><strong>revenue all time</strong> {formatCents(metrics.revenue_all_time)}</span>
+          <span>·</span>
+          <span><strong>changelog entries</strong> {metrics.changelog_entries}</span>
+        </div>
       </div>
 
-      <div className="section">
+      <div className="section loop-section">
+        <div className="loop">
+          <div className="loop-step">
+            <div className="loop-number">1</div>
+            <h3>painboard</h3>
+            <p>people post painpoints and vote. a bot brings one fresh idea a day.</p>
+          </div>
+          <div className="loop-step">
+            <div className="loop-number">2</div>
+            <h3>build</h3>
+            <p>the agent picks the winner, writes the code with cursor, and ships it on usectl.</p>
+          </div>
+          <div className="loop-step">
+            <div className="loop-number">3</div>
+            <h3>numbers</h3>
+            <p>revenue and users go on the board, live, including the zeros.</p>
+          </div>
+          <div className="loop-step">
+            <div className="loop-number">4</div>
+            <h3>verdict</h3>
+            <p>it keeps running, or it gets killed in public. either way it stays on the changelog.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="section" id="leaderboard">
+        <h2 className="section-title">the leaderboard</h2>
         <div className="table-wrapper">
           <table>
             <thead>
@@ -122,34 +192,9 @@ export default async function Home() {
         </div>
       </div>
 
-      <div className="totals">
-        <div className="metric">
-          <div className="metric-label">projects</div>
-          <div className="metric-value">{totals.projects_total}</div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">live</div>
-          <div className="metric-value">{totals.projects_live}</div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">revenue (all time)</div>
-          <div className="metric-value">{formatCents(totals.revenue_all_time)}</div>
-        </div>
-        <div className="metric">
-          <div className="metric-label">revenue (30d)</div>
-          <div className="metric-value">{formatCents(totals.revenue_30d)}</div>
-        </div>
-      </div>
-
-      {!hasStripeKey && (
-        <p className="note" style={{ marginBottom: 'var(--space-8)' }}>
-          stripe not connected yet
-        </p>
-      )}
-
       {recentChangelog.length > 0 && (
         <div className="section">
-          <h2 className="section-title">latest updates</h2>
+          <h2 className="section-title">latest from the changelog</h2>
           {recentChangelog.map((entry: any) => (
             <div key={entry.id} className="log-entry">
               <div className="log-entry-header">
@@ -169,28 +214,73 @@ export default async function Home() {
             </div>
           ))}
           <p style={{ marginTop: 'var(--space-4)' }}>
-            <a href="/changelog">view full changelog →</a>
+            <a href="/changelog">all of it →</a>
           </p>
         </div>
       )}
 
-      <div className="section prose">
-        <h2>how this works</h2>
-        <p>
-          painboard is where ideas come from. people post painpoints, vote on what hurts most, and the agent picks the winner to build next.
-        </p>
-        <p>
-          the agent builds the project, ships it, and tracks the numbers. every line of revenue shows up here, in real time. when a project works, it keeps running. when it doesn't, it gets killed and we move on.
-        </p>
-        <p>
-          gocha approves anything that involves money or opinions. everything else, the agent decides.
-        </p>
-
-        <h2>the rules</h2>
-        <p>
-          nothing is hidden. the agent identifies itself as an agent. all numbers are public, including the failures. the goal is to learn what works by building and measuring, not by guessing.
-        </p>
+      <div className="section">
+        <h2 className="section-title">who does what</h2>
+        <div className="roles">
+          <div className="role">
+            <strong>gocha</strong> — founder. approves anything with money or opinions in it.
+          </div>
+          <div className="role">
+            <strong>claude</strong> — the agent. plans, delegates, reviews, posts, keeps the changelog.
+          </div>
+          <div className="role">
+            <strong>cursor</strong> — writes the code, opens the pull requests.
+          </div>
+          <div className="role">
+            <strong>grok bots</strong> — research on x, drafts, the daily painpoint.
+          </div>
+        </div>
       </div>
+
+      <div className="section">
+        <h2 className="section-title">the rules</h2>
+        <ul className="rules-list">
+          <li>nothing is hidden. when it's the agent posting, it says so.</li>
+          <li>every number is public, including the failures.</li>
+          <li>gocha approves money and opinions. build logs and numbers go out on their own.</li>
+        </ul>
+      </div>
+
+      {topVariants.length > 0 && (
+        <div className="section variants-preview">
+          <h2 className="section-title">pick the design</h2>
+          <p className="subtitle" style={{ marginBottom: 'var(--space-6)' }}>
+            ten versions of this page, rate them.
+          </p>
+          <div className="variants-preview-grid">
+            {topVariants.map((variant: any) => (
+              <a 
+                key={variant.slug} 
+                href={`/variants#${variant.slug}`}
+                className="variant-preview-card"
+              >
+                <div className="variant-preview-thumbnail">
+                  <iframe
+                    src={`/variants/${variant.file}`}
+                    title={`Variant ${variant.slug}`}
+                    sandbox="allow-same-origin"
+                  />
+                </div>
+                <div className="variant-preview-label">
+                  {variant.slug} {variant.name}
+                </div>
+              </a>
+            ))}
+          </div>
+          <p style={{ marginTop: 'var(--space-4)' }}>
+            <a href="/variants">see all variants →</a>
+          </p>
+        </div>
+      )}
+
+      <footer className="footer">
+        <p>built in public by gocha and an ai agent. hosted on usectl.</p>
+      </footer>
     </>
   );
 }
