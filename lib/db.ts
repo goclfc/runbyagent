@@ -6,7 +6,11 @@ export function getPool(): Pool {
   if (!pool) {
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
-      throw new Error('DATABASE_URL is not set');
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('DATABASE_URL is not set');
+      }
+      // During build, return a dummy pool
+      return null as any;
     }
     
     const schema = process.env.DB_SCHEMA || 'public';
@@ -28,6 +32,10 @@ export function getPool(): Pool {
 
 export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
   const pool = getPool();
+  if (!pool) {
+    // Return empty result during build
+    return [];
+  }
   const result = await pool.query(text, params);
   return result.rows;
 }
