@@ -1281,6 +1281,7 @@ td .desc {
   grid-row: 3 / 8;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .tile-board .table-wrapper {
@@ -1288,6 +1289,7 @@ td .desc {
   overflow-y: auto;
   margin: 0 -20px;
   padding: 0 20px;
+  min-height: 0;
 }
 
 .tile-log {

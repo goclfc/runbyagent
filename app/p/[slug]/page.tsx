@@ -2,6 +2,7 @@ import { query } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { formatDateShortTbilisi } from '@/lib/date-utils';
 import { ProjectLiveStats } from '@/app/project-live-metrics';
+import { ProjectLink } from '@/app/project-link';
 
 export const dynamic = 'force-dynamic';
 
@@ -86,24 +87,13 @@ export default async function ProjectPage({ params }: PageProps) {
         </div>
         <div className="project-links">
           {project.url && (
-            <a 
-              href={project.url} 
-              target="_blank" 
-              rel="noopener noreferrer"
+            <ProjectLink
+              href={project.url}
+              slug={project.slug}
               className="project-primary-link"
-              onClick={() => {
-                if (typeof window !== 'undefined' && window.gtag) {
-                  window.gtag('event', 'outbound_project', { slug: project.slug });
-                }
-                fetch('/api/event', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ name: 'outbound_project', path: window.location.pathname, meta: { slug: project.slug } })
-                }).catch(() => {});
-              }}
             >
               open {project.name} →
-            </a>
+            </ProjectLink>
           )}
           {project.repo_url && (
             <a href={project.repo_url} target="_blank" rel="noopener noreferrer">repo →</a>
