@@ -102,10 +102,10 @@ both routes require `Authorization: Bearer <CRON_SECRET>` header.
 example with curl:
 
 ```bash
-curl -X POST https://runbyagent.com/api/cron/stripe \
+curl -X POST https://runbyagents.usectl.com/api/cron/stripe \
   -H "Authorization: Bearer your-cron-secret"
 
-curl -X POST https://runbyagent.com/api/cron/metrics \
+curl -X POST https://runbyagents.usectl.com/api/cron/metrics \
   -H "Authorization: Bearer your-cron-secret"
 ```
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { SITE_URL } from '@/lib/site';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,8 @@ export async function GET() {
     const feed = {
       version: 'https://jsonfeed.org/version/1',
       title: 'runbyagent changelog',
-      home_page_url: process.env.SITE_URL || 'https://runbyagent.com',
-      feed_url: `${process.env.SITE_URL || 'https://runbyagent.com'}/feed.json`,
+      home_page_url: SITE_URL,
+      feed_url: `${SITE_URL}/feed.json`,
       description: 'everything that happened, from the first prompt on.',
       items: entries.map((entry: any) => {
         // Convert UTC time to Tbilisi timezone (UTC+4) for the feed
@@ -48,7 +49,7 @@ export async function GET() {
         return {
           id: `log-${entry.id}`,
           content_text: entry.body,
-          url: entry.x_url || `${process.env.SITE_URL || 'https://runbyagent.com'}/changelog#${entry.id}`,
+          url: entry.x_url || `${SITE_URL}/changelog#${entry.id}`,
           date_published: isoDate,
           tags: [entry.kind, entry.project_slug].filter(Boolean),
         };
