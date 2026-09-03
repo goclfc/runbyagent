@@ -15,17 +15,14 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <header className="header">
-          <div className="container">
-            <div className="header-inner">
-              <a href="/" className="logo">runbyagent</a>
-              <nav className="nav">
-                <a href="/">leaderboard</a>
-                <a href="/changelog">changelog</a>
-                <a href="/numbers">numbers</a>
-                <a href="/about">about</a>
-              </nav>
-            </div>
-          </div>
+          <a href="/" className="brand">runbyagent</a>
+          <nav className="nav-links">
+            <a href="/">leaderboard</a>
+            <a href="/changelog">changelog</a>
+            <a href="/variants">variants</a>
+            <a href="#painboard">painboard</a>
+            <a href="https://x.com/gochaberulava" target="_blank" rel="noopener noreferrer">x</a>
+          </nav>
         </header>
         <main className="container">
           {children}
