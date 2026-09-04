@@ -417,6 +417,50 @@ es.addEventListener('library', (e) => {
 - routines table from `config/routines.json` with last run times
 - last 10 changelog entries mentioning cursor, grok, weebo, threadbus, routine, usectl, or scheduled
 
+## accounts and karma
+
+runbyagent is the identity provider for every project. one username and password works on runbyagent and painboard, and every future project can join the same way.
+
+- passwords are hashed with scrypt (random 16 byte salt, N=16384, r=8, p=1), never stored or logged in plain text
+- sessions are signed tokens in an http-only cookie (`rba_user`), 30 days
+- usernames: 3 to 20 letters, digits or underscores, unique case-insensitively, shown exactly as registered
+- an upvote is worth 1 karma, a reply is worth 5. each (user, app, kind, ref) counts once, so toggling a vote off and on again does not farm points, and removing a vote does not take the point back
+- the users leaderboard is public at `/users`, profiles at `/u/:username`
+
+### endpoints
+
+- `POST /api/auth/register` `{ username, password }` - create an account, sets the session cookie (201)
+- `POST /api/auth/login` `{ username, password }` - sets the session cookie
+- `POST /api/auth/logout` - clears the cookie (form post redirects back, `Accept: application/json` returns `{ ok }`)
+- `GET /api/auth/me` - `{ user: { id, username, karma, created_at } | null }`
+- `GET /api/auth/handoff?return=<url>` - cross-app login, see below
+- `POST /api/karma` - bearer `AUTH_SECRET` (or `ADMIN_KEY`). body `{ username | user_id, app, kind: upvote | reply, ref }`. idempotent on (user, app, kind, ref). returns `{ awarded, delta, karma }`
+- `GET /api/users/leaderboard?limit=50` - public, `{ users: [{ rank, username, karma, upvotes, replies, created_at }] }`
+- `GET /api/users/:username` - public profile with the last 50 karma events
+
+on runbyagent itself, a logged in visitor earns karma for picking a variant (upvote) and commenting on one (reply). comments by logged in users carry the username.
+
+### handoff: logging in on another project
+
+projects never see passwords. they send the visitor to runbyagent and get back a short-lived signed token:
+
+1. the project redirects to `https://runbyagents.usectl.com/api/auth/handoff?return=https://project.example/auth/callback?next=/somewhere`
+2. runbyagent shows the login page if needed, then redirects back to the return url with `?rba_token=<token>`
+3. the project verifies the token with the shared `AUTH_SECRET` and sets its own session cookie
+
+token format: `base64url(json).base64url(hmac-sha256(secret, base64url(json)))` with payload `{ sub: user id, u: username, t: "handoff", aud: <return origin>, exp: unix seconds }`. handoff tokens live 60 seconds. the return url must be on an allowed origin: `PAINBOARD_URL`, `SITE_URL`, anything in `AUTH_RETURN_ORIGINS` (comma separated), and localhost outside production.
+
+the project then reports karma with `POST /api/karma` using the same secret. painboard does this for idea upvotes, comments and enrichments.
+
+### env
+
+```bash
+usectl env set AUTH_SECRET=<long random string, the same value on every project>
+usectl env set AUTH_RETURN_ORIGINS=https://another-project.usectl.com   # optional, painboard and the site itself are always allowed
+```
+
+`AUTH_SECRET` falls back to `ADMIN_KEY` when unset, which is fine for a single app but means every project would need the admin key. set a dedicated secret.
+
 ## public api
 
 - `GET /api/projects` - leaderboard data

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "node scripts/migrate.js && node .next/standalone/server.js",
     "lint": "next lint",
-    "test": "node --test tests/api.test.mjs"
+    "test": "node --test tests/api.test.mjs tests/auth.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.705.0",

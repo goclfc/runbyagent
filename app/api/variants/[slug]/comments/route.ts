@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getOrCreateVisitorId, setVisitorCookie } from '@/lib/visitor';
 import { hashIp, getClientIp, checkRateLimit, incrementRateLimit, verifyDwellTimeToken } from '@/lib/rate-limit';
+import { getSessionUser } from '@/lib/auth';
+import { awardKarma } from '@/lib/karma';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,13 +111,21 @@ export async function POST(
     }
     const variantId = variants[0].id;
 
-    // Insert comment
+    // Insert comment. a logged in user posts under their username.
+    const user = await getSessionUser();
     const result = await query<{ id: number }>(
-      `INSERT INTO variant_comments (variant_id, visitor_id, name, body)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO variant_comments (variant_id, visitor_id, name, body, user_id)
+       VALUES ($1, $2, $3, $4, $5)
        RETURNING id`,
-      [variantId, visitorId, name || null, commentBody.trim()]
+      [variantId, visitorId, user ? user.username : (name || null), commentBody.trim(), user?.id ?? null]
     );
+
+    // logged in: a comment is a reply, worth 5 karma
+    let karma: number | undefined;
+    if (user) {
+      const awarded = await awardKarma(user.id, 'runbyagent', 'reply', `comment:${result[0].id}`);
+      karma = awarded.karma;
+    }
     
     // Increment rate limits after successful insert
     if (clientIp) {
@@ -141,7 +151,7 @@ export async function POST(
     }
 
     // Set the cookie
-    const response = NextResponse.json({ success: true, id: result[0].id });
+    const response = NextResponse.json({ success: true, id: result[0].id, ...(karma !== undefined ? { karma } : {}) });
     await setVisitorCookie(visitorId);
 
     return response;

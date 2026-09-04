@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getOrCreateVisitorId, setVisitorCookie } from '@/lib/visitor';
 import { hashIp, getClientIp, checkRateLimit, incrementRateLimit } from '@/lib/rate-limit';
+import { getSessionUser } from '@/lib/auth';
+import { awardKarma } from '@/lib/karma';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,13 +58,21 @@ export async function POST(
     const variantId = variants[0].id;
 
     // Upsert pick (replace old pick if exists)
+    const user = await getSessionUser();
     await query(
-      `INSERT INTO variant_picks (visitor_id, variant_id)
-       VALUES ($1, $2)
+      `INSERT INTO variant_picks (visitor_id, variant_id, user_id)
+       VALUES ($1, $2, $3)
        ON CONFLICT (visitor_id)
-       DO UPDATE SET variant_id = $2, created_at = NOW()`,
-      [visitorId, variantId]
+       DO UPDATE SET variant_id = $2, user_id = COALESCE($3, variant_picks.user_id), created_at = NOW()`,
+      [visitorId, variantId, user?.id ?? null]
     );
+
+    // logged in: a pick is an upvote, worth 1 karma once per variant
+    let karma: number | undefined;
+    if (user) {
+      const result = await awardKarma(user.id, 'runbyagent', 'upvote', `variant:${slug}`);
+      karma = result.karma;
+    }
     
     // IP deduplication: maintain max 3 picks per IP
     if (clientIp) {
@@ -92,7 +102,7 @@ export async function POST(
     }
 
     // Set the cookie
-    const response = NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true, ...(karma !== undefined ? { karma } : {}) });
     await setVisitorCookie(visitorId);
 
     return response;
