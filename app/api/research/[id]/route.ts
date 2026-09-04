@@ -11,14 +11,15 @@ function checkAuth(request: NextRequest): boolean {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!checkAuth(request)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
   try {
-    const docId = parseInt(params.id);
+    const { id } = await params;
+    const docId = parseInt(id);
     if (isNaN(docId)) {
       return NextResponse.json({ error: 'invalid id' }, { status: 400 });
     }

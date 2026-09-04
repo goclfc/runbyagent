@@ -11,15 +11,16 @@ function checkAuth(request: NextRequest): boolean {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   if (!checkAuth(request)) {
     return new Response('Unauthorized', { status: 401 });
   }
 
   try {
+    const { id } = await params;
     // Remove .md extension to get the actual ID
-    const docId = parseInt(params.id.replace(/\.md$/, ''));
+    const docId = parseInt(id.replace(/\.md$/, ''));
     if (isNaN(docId)) {
       return new Response('Invalid ID', { status: 400 });
     }
