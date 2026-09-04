@@ -22,7 +22,6 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^19.0.6",
     "@types/react-dom": "^19.0.2",
-    "puppeteer": "^25.10.0",
     "typescript": "^5.7.2"
   }
 }

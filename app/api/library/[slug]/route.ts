@@ -5,12 +5,53 @@ import { getDateKeyTbilisi } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
+async function serveDownload(slug: string, format: 'md' | 'json') {
+  const result = await query(`
+    SELECT id, slug, kind, name, summary, body_md, lines, author, sources, related, verified_at, updated_at
+    FROM research_docs
+    WHERE slug = $1 AND published = true
+  `, [slug]);
+
+  if (result.length === 0) {
+    return new NextResponse('Not found', { status: 404 });
+  }
+
+  const doc = result[0];
+
+  if (format === 'md') {
+    const markdown = doc.body_md || (Array.isArray(doc.lines) ? doc.lines.join('\n') : '');
+    return new NextResponse(markdown, {
+      headers: {
+        'content-type': 'text/markdown; charset=utf-8',
+        'content-disposition': `inline; filename="${slug}.md"`,
+      },
+    });
+  } else {
+    return new NextResponse(JSON.stringify(doc, null, 2), {
+      headers: {
+        'content-type': 'application/json; charset=utf-8',
+        'content-disposition': `inline; filename="${slug}.json"`,
+      },
+    });
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
   try {
-    const { slug } = await params;
+    let { slug } = await params;
+    
+    // Handle .md and .json extensions in the slug
+    if (slug.endsWith('.md')) {
+      const cleanSlug = slug.slice(0, -3);
+      return serveDownload(cleanSlug, 'md');
+    }
+    if (slug.endsWith('.json')) {
+      const cleanSlug = slug.slice(0, -5);
+      return serveDownload(cleanSlug, 'json');
+    }
 
     const result = await query(`
       SELECT 

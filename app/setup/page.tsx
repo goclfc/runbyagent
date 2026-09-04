@@ -92,26 +92,21 @@ async function getRecentSetupChanges() {
 
 export default async function SetupPage() {
   const doc = await getSetupDoc();
-
-  if (!doc) {
-    notFound();
-  }
-
   const routines = await getRoutines();
   const lastRuns = await getRoutineLastRuns(routines);
   const recentChanges = await getRecentSetupChanges();
 
-  const sources = doc.sources ? (Array.isArray(doc.sources) ? doc.sources : []) : [];
+  const sources = doc?.sources ? (Array.isArray(doc.sources) ? doc.sources : []) : [];
 
   return (
     <>
       <div className="hero">
         <div className="log-entry-header" style={{ marginBottom: 'var(--space-3)' }}>
           <span className="chip">setup</span>
-          <span className="chip">{doc.author}</span>
+          {doc && <span className="chip">{doc.author}</span>}
         </div>
-        <h1>{doc.name || 'the setup'}</h1>
-        {doc.summary && (
+        <h1>{doc?.name || 'the setup'}</h1>
+        {doc?.summary && (
           <p className="subtitle" style={{ marginTop: 'var(--space-3)' }}>
             {doc.summary}
           </p>
@@ -119,7 +114,7 @@ export default async function SetupPage() {
       </div>
 
       <div className="section">
-        {doc.body_md && (
+        {doc?.body_md ? (
           <div className="markdown-content" style={{ marginBottom: 'var(--space-8)' }}>
             {doc.body_md.split('\n\n').map((para: string, i: number) => {
               if (para.startsWith('# ')) {
@@ -130,6 +125,10 @@ export default async function SetupPage() {
               }
               return <p key={i} style={{ marginBottom: 'var(--space-3)' }}>{para}</p>;
             })}
+          </div>
+        ) : (
+          <div style={{ marginBottom: 'var(--space-8)', color: 'var(--text-2)', fontStyle: 'italic' }}>
+            <p>the setup article is being written by the agent; check back soon.</p>
           </div>
         )}
 
@@ -214,26 +213,30 @@ export default async function SetupPage() {
           </div>
         )}
 
-        <div style={{ marginBottom: 'var(--space-6)', fontSize: '13px', color: 'var(--text-2)' }}>
-          <a href="/api/library/setup.md" style={{ marginRight: 'var(--space-3)' }}>
-            download as markdown
-          </a>
-          <a href="/api/library/setup.json">
-            download as json
-          </a>
-        </div>
+        {doc && (
+          <>
+            <div style={{ marginBottom: 'var(--space-6)', fontSize: '13px', color: 'var(--text-2)' }}>
+              <a href="/api/library/setup.md" style={{ marginRight: 'var(--space-3)' }}>
+                download as markdown
+              </a>
+              <a href="/api/library/setup.json">
+                download as json
+              </a>
+            </div>
 
-        <div style={{ fontSize: '13px', color: 'var(--text-2)' }}>
-          <span>updated {formatDateTbilisi(doc.updated_at).toLowerCase()}</span>
-          {doc.verified_at && (
-            <span style={{ marginLeft: 'var(--space-2)' }}>
-              · verified {formatDateTbilisi(doc.verified_at).toLowerCase()}
-            </span>
-          )}
-          <span style={{ marginLeft: 'var(--space-2)' }}>
-            · {doc.views} {doc.views === 1 ? 'view' : 'views'}
-          </span>
-        </div>
+            <div style={{ fontSize: '13px', color: 'var(--text-2)' }}>
+              <span>updated {formatDateTbilisi(doc.updated_at).toLowerCase()}</span>
+              {doc.verified_at && (
+                <span style={{ marginLeft: 'var(--space-2)' }}>
+                  · verified {formatDateTbilisi(doc.verified_at).toLowerCase()}
+                </span>
+              )}
+              <span style={{ marginLeft: 'var(--space-2)' }}>
+                · {doc.views} {doc.views === 1 ? 'view' : 'views'}
+              </span>
+            </div>
+          </>
+        )}
       </div>
     </>
   );

@@ -12,6 +12,8 @@ export const dynamic = 'force-dynamic';
 export default async function Home() {
   let projects = [];
   let recentChangelog: any[] = [];
+  let libraryCount = 0;
+  let latestLibraryDoc: any = null;
 
   try {
     projects = await query(`
@@ -43,6 +45,19 @@ export default async function Home() {
       ORDER BY le.created_at DESC
       LIMIT 6
     `);
+
+    const libraryCountResult = await query(`
+      SELECT COUNT(*)::int as count FROM research_docs WHERE published = true
+    `);
+    libraryCount = libraryCountResult[0]?.count || 0;
+
+    const latestLibraryResult = await query(`
+      SELECT slug, name FROM research_docs
+      WHERE published = true
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `);
+    latestLibraryDoc = latestLibraryResult[0] || null;
   } catch (error) {
     console.error('Error loading home page:', error);
   }
@@ -127,6 +142,13 @@ export default async function Home() {
             );
           })}
         </ul>
+        {libraryCount > 0 && latestLibraryDoc && (
+          <div style={{ marginTop: 'var(--space-2)', fontSize: '14px', color: 'var(--text-2)' }}>
+            <a href="/library" style={{ color: 'var(--text-2)' }}>
+              library: {libraryCount} {libraryCount === 1 ? 'piece' : 'pieces'}, latest: {latestLibraryDoc.name}
+            </a>
+          </div>
+        )}
         <a href="/changelog" className="more-link">all of it →</a>
       </div>
 
