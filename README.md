@@ -434,6 +434,7 @@ runbyagent is the identity provider for every project. one username and password
 - `POST /api/auth/logout` - clears the cookie (form post redirects back, `Accept: application/json` returns `{ ok }`)
 - `GET /api/auth/me` - `{ user: { id, username, karma, created_at } | null }`
 - `GET /api/auth/handoff?return=<url>` - cross-app login, see below
+- `POST /api/auth/exchange` `{ token }` - server-to-server: turn a handoff token into `{ user, aud, exp }` without sharing the secret
 - `POST /api/karma` - bearer `AUTH_SECRET` (or `ADMIN_KEY`). body `{ username | user_id, app, kind: upvote | reply, ref }`. idempotent on (user, app, kind, ref). returns `{ awarded, delta, karma }`
 - `GET /api/users/leaderboard?limit=50` - public, `{ users: [{ rank, username, karma, upvotes, replies, created_at }] }`
 - `GET /api/users/:username` - public profile with the last 50 karma events
@@ -446,7 +447,7 @@ projects never see passwords. they send the visitor to runbyagent and get back a
 
 1. the project redirects to `https://runbyagents.usectl.com/api/auth/handoff?return=https://project.example/auth/callback?next=/somewhere`
 2. runbyagent shows the login page if needed, then redirects back to the return url with `?rba_token=<token>`
-3. the project verifies the token with the shared `AUTH_SECRET` and sets its own session cookie
+3. the project verifies the token with the shared `AUTH_SECRET`, or posts it to `/api/auth/exchange` when it has no secret, and sets its own session cookie
 
 token format: `base64url(json).base64url(hmac-sha256(secret, base64url(json)))` with payload `{ sub: user id, u: username, t: "handoff", aud: <return origin>, exp: unix seconds }`. handoff tokens live 60 seconds. the return url must be on an allowed origin: `PAINBOARD_URL`, `SITE_URL`, anything in `AUTH_RETURN_ORIGINS` (comma separated), and localhost outside production.
 

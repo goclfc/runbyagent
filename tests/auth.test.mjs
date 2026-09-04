@@ -182,6 +182,14 @@ test('handoff sends a logged out visitor to login and a logged in one back with 
 
   const evil = await alice.call(`/api/auth/handoff?return=${encodeURIComponent('https://evil.example/steal')}`, { redirect: 'manual' });
   assert.strictEqual(evil.res.status, 400);
+
+  // a project without the shared secret can exchange the token server-to-server
+  const exchanged = await jar().call('/api/auth/exchange', { method: 'POST', body: { token } });
+  assert.strictEqual(exchanged.res.status, 200, JSON.stringify(exchanged.data));
+  assert.strictEqual(exchanged.data.user.username, username);
+  assert.strictEqual(exchanged.data.aud, 'http://localhost:3100');
+  const garbage = await jar().call('/api/auth/exchange', { method: 'POST', body: { token: 'nope.nope' } });
+  assert.strictEqual(garbage.res.status, 401);
 });
 
 test('logout clears the session', async () => {
