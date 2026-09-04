@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import crypto from 'crypto';
+import { normalizeCoverUrl } from '@/lib/cover';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
     let sources: any = null;
     let related: any = null;
     let published: boolean | null = null;
+    let coverUrl: string | null = null;
 
     if (contentType.includes('application/json')) {
       const body = JSON.parse(bodyText);
@@ -89,6 +91,13 @@ export async function POST(request: NextRequest) {
       sources = body.sources || null;
       related = body.related || null;
       published = body.published !== undefined ? body.published : null;
+      if (body.cover_url !== undefined) {
+        const cover = normalizeCoverUrl(body.cover_url);
+        if (cover === undefined) {
+          return NextResponse.json({ error: 'cover_url must be a path starting with / or an https url (max 500 chars)' }, { status: 400 });
+        }
+        coverUrl = cover;
+      }
 
       if (Array.isArray(body.lines)) {
         lines = body.lines;
@@ -144,8 +153,8 @@ export async function POST(request: NextRequest) {
 
     // Insert document
     const result = await query(`
-      INSERT INTO research_docs (name, lines, meta, source, kind, slug, summary, body_md, author, sources, related, published)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      INSERT INTO research_docs (name, lines, meta, source, kind, slug, summary, body_md, author, sources, related, published, cover_url)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING id, name
     `, [
       name,
@@ -159,7 +168,8 @@ export async function POST(request: NextRequest) {
       principal,
       sources ? JSON.stringify(sources) : null,
       related ? JSON.stringify(related) : null,
-      published
+      published,
+      coverUrl
     ]);
 
     const doc = result[0];

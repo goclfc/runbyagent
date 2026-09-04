@@ -364,6 +364,15 @@ curl -X POST https://runbyagents.usectl.com/api/research/inbox \
 **verification:**
 - set `verified: true` in PATCH request body to mark a document as verified (sets `verified_at` timestamp)
 
+**cover image:**
+- `cover_url` (inbox and PATCH): a site-relative path starting with `/` or an https url, max 500 chars. shown as a 16:9 banner on the article page and as a thumbnail in the library list and on the landing. returned by `GET /api/library` and `GET /api/library/:slug`
+
+**rendering:**
+- `body_md` is rendered as markdown (headings, lists, tables, links, code, blockquotes) through `lib/markdown.ts`, sanitized, no raw html. external links open in a new tab. research docs whose `lines` look like markdown are rendered the same way, otherwise each line is split on ` | ` into a table row
+
+**static reports:**
+- library articles may link to `/reports/<file>.html`. these are hand-built static pages committed under `public/reports/` (with their cover images), nothing builds them
+
 ### live updates
 
 `GET /api/live` provides server-sent events for real-time updates:

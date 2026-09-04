@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import { formatDateTbilisi, formatTimeTbilisi } from '@/lib/date-utils';
+import { linesLookLikeMarkdown, renderLines } from '@/lib/markdown';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,22 +58,26 @@ export default async function ResearchPage() {
               <h2 className="section-title" style={{ marginTop: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
                 {doc.name || `Document #${doc.id}`}
               </h2>
-              <div className="table-wrapper">
-                <table>
-                  <tbody>
-                    {lines.map((line, index) => {
-                      const cells = line.split(' | ');
-                      return (
-                        <tr key={index}>
-                          {cells.map((cell, cellIndex) => (
-                            <td key={cellIndex}>{cell}</td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              {linesLookLikeMarkdown(lines) ? (
+                <div className="doc-body markdown" dangerouslySetInnerHTML={{ __html: renderLines(lines) }} />
+              ) : (
+                <div className="table-wrapper">
+                  <table>
+                    <tbody>
+                      {lines.map((line, index) => {
+                        const cells = line.split(' | ');
+                        return (
+                          <tr key={index}>
+                            {cells.map((cell, cellIndex) => (
+                              <td key={cellIndex}>{cell}</td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
               <p style={{ marginTop: 'var(--space-2)', fontSize: '13px', color: 'var(--text-2)' }}>
                 {doc.count} lines
               </p>

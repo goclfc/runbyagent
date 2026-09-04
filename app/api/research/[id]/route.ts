@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import crypto from 'crypto';
+import { normalizeCoverUrl } from '@/lib/cover';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,7 +53,7 @@ export async function GET(
     }
 
     const result = await query(`
-      SELECT id, name, lines, meta, source, created_at, kind, slug, summary, body_md, author, sources, related, published, verified_at, updated_at, views
+      SELECT id, name, lines, meta, source, created_at, kind, slug, summary, body_md, author, sources, related, published, verified_at, updated_at, views, cover_url
       FROM research_docs
       WHERE id = $1
     `, [docId]);
@@ -81,6 +82,7 @@ export async function GET(
       verified_at: doc.verified_at,
       updated_at: doc.updated_at,
       views: doc.views,
+      cover_url: doc.cover_url,
     });
   } catch (error) {
     console.error('Error fetching research doc:', error);
@@ -173,6 +175,15 @@ export async function PATCH(
     if (body.published !== undefined) {
       updates.push(`published = $${paramIndex++}`);
       values.push(body.published);
+    }
+
+    if (body.cover_url !== undefined) {
+      const cover = normalizeCoverUrl(body.cover_url);
+      if (cover === undefined) {
+        return NextResponse.json({ error: 'cover_url must be a path starting with / or an https url (max 500 chars)' }, { status: 400 });
+      }
+      updates.push(`cover_url = $${paramIndex++}`);
+      values.push(cover);
     }
 
     // Check for verified flag in body

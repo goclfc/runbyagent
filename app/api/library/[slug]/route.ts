@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 async function serveDownload(slug: string, format: 'md' | 'json') {
   const result = await query(`
-    SELECT id, slug, kind, name, summary, body_md, lines, author, sources, related, verified_at, updated_at
+    SELECT id, slug, kind, name, summary, body_md, lines, author, sources, related, verified_at, updated_at, cover_url
     FROM research_docs
     WHERE slug = $1 AND published = true
   `, [slug]);
@@ -69,6 +69,7 @@ export async function GET(
         verified_at,
         updated_at,
         views,
+        cover_url,
         (SELECT COUNT(*) FROM library_versions WHERE doc_id = research_docs.id) as versions_count
       FROM research_docs
       WHERE slug = $1 AND published = true
@@ -131,6 +132,7 @@ export async function GET(
       verified_at: doc.verified_at,
       updated_at: doc.updated_at,
       views: doc.views,
+      cover_url: doc.cover_url,
       versions_count: doc.versions_count,
     });
   } catch (error) {
