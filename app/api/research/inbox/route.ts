@@ -41,6 +41,14 @@ async function checkAuth(request: NextRequest): Promise<string | null> {
   return null;
 }
 
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
 export async function POST(request: NextRequest) {
   const principal = await checkAuth(request);
   if (!principal) {
@@ -61,12 +69,26 @@ export async function POST(request: NextRequest) {
     let lines: string[] = [];
     let meta: any = null;
     let source: string | null = null;
+    let kind: string = 'research';
+    let slug: string | null = null;
+    let summary: string | null = null;
+    let bodyMd: string | null = null;
+    let sources: any = null;
+    let related: any = null;
+    let published: boolean | null = null;
 
     if (contentType.includes('application/json')) {
       const body = JSON.parse(bodyText);
       name = body.name || null;
       meta = body.meta || null;
       source = body.source || null;
+      kind = body.kind || 'research';
+      slug = body.slug || null;
+      summary = body.summary || null;
+      bodyMd = body.body_md || null;
+      sources = body.sources || null;
+      related = body.related || null;
+      published = body.published !== undefined ? body.published : null;
 
       if (Array.isArray(body.lines)) {
         lines = body.lines;
@@ -84,6 +106,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'unsupported content type' }, { status: 415 });
     }
 
+    // Validate kind
+    if (!['research', 'finding', 'article', 'setup'].includes(kind)) {
+      return NextResponse.json({ error: 'kind must be research, finding, article, or setup' }, { status: 400 });
+    }
+
     // Validate before any INSERT
     if (lines.length === 0) {
       return NextResponse.json({ error: 'lines cannot be empty' }, { status: 400 });
@@ -94,18 +121,46 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate author as non-empty slug up to 32 chars
-    if (!principal || principal.length === 0 || principal.length > 32 || !/^[a-z0-9_-]+$/i.test(principal)) {
+    if (!principal || principal.length === 0 || principal.length > 32 || !/^[a-z0-9_+-]{1,32}$/i.test(principal)) {
       return NextResponse.json({ error: 'invalid author' }, { status: 400 });
+    }
+
+    // Generate slug if not provided and name exists
+    if (!slug && name) {
+      slug = generateSlug(name);
+    }
+
+    // Default published based on kind
+    if (published === null) {
+      published = kind === 'research';
     }
 
     const isPrivate = meta && meta.private === true;
 
+    // Private docs never publish
+    if (isPrivate) {
+      published = false;
+    }
+
     // Insert document
     const result = await query(`
-      INSERT INTO research_docs (name, lines, meta, source)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO research_docs (name, lines, meta, source, kind, slug, summary, body_md, author, sources, related, published)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
       RETURNING id, name
-    `, [name, JSON.stringify(lines), meta ? JSON.stringify(meta) : null, source]);
+    `, [
+      name,
+      JSON.stringify(lines),
+      meta ? JSON.stringify(meta) : null,
+      source,
+      kind,
+      slug,
+      summary,
+      bodyMd,
+      principal,
+      sources ? JSON.stringify(sources) : null,
+      related ? JSON.stringify(related) : null,
+      published
+    ]);
 
     const doc = result[0];
     const count = lines.length;

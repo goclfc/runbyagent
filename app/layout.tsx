@@ -3,6 +3,7 @@ import Script from 'next/script';
 import './globals.css';
 import { AnalyticsBeacon } from './analytics-beacon';
 import { OnlinePill } from './online-pill';
+import { LiveClient } from './live-client';
 import { SITE_URL } from '@/lib/site';
 
 const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <AnalyticsBeacon />
+        <LiveClient />
         {isProduction && (
           <>
             <Script
@@ -55,6 +57,7 @@ export default function RootLayout({
           <nav className="nav-links">
             <a href="/">leaderboard</a>
             <a href="/changelog">changelog</a>
+            <a href="/library">library</a>
             <a href="/variants">variants</a>
             <a href={PAINBOARD_URL} target="_blank" rel="noopener noreferrer">painboard</a>
             <a href="https://x.com/gochaberulava" target="_blank" rel="noopener noreferrer">x</a>
