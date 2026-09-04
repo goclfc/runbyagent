@@ -6,9 +6,9 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    const expectedToken = process.env.ADMIN_TOKEN;
+    const expectedAuth = `Bearer ${process.env.ADMIN_KEY}`;
     
-    if (!expectedToken || authHeader !== `Bearer ${expectedToken}`) {
+    if (!authHeader || authHeader !== expectedAuth) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 

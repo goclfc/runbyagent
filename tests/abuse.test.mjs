@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { createHmac } from 'crypto';
 
 const BASE = process.env.BASE || 'http://localhost:3000';
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'test-admin-token';
+const ADMIN_KEY = process.env.ADMIN_KEY || 'test-admin-key';
 const HASH_SALT = process.env.HASH_SALT || process.env.ADMIN_KEY || 'default-salt-change-in-production';
 
 async function request(path, options = {}) {
@@ -245,7 +245,7 @@ test('ranking only uses trusted ratings (60s age threshold)', async () => {
 test('admin abuse endpoint returns top ips with valid auth', async () => {
   const { response, data } = await request('/api/admin/abuse', {
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
   });
 
@@ -291,7 +291,7 @@ test('admin reset endpoint clears variant data with valid auth', async () => {
   const { response, data } = await request('/api/admin/variants/reset', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
     body: JSON.stringify({ slug: '08', confirm: 'reset-08' }),
   });
@@ -315,7 +315,7 @@ test('admin reset endpoint validates slug', async () => {
   const { response } = await request('/api/admin/variants/reset', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
     body: JSON.stringify({}),
   });
@@ -327,7 +327,7 @@ test('admin reset endpoint requires confirmation', async () => {
   const { response, data } = await request('/api/admin/variants/reset', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
     body: JSON.stringify({ slug: '01' }),
   });
@@ -341,7 +341,7 @@ test('admin reset endpoint returns 404 for invalid variant', async () => {
   const { response } = await request('/api/admin/variants/reset', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
     body: JSON.stringify({ slug: 'nonexistent' }),
   });
@@ -373,7 +373,7 @@ test('ip deduplication limits picks per ip to 3', async () => {
 test('admin audit endpoint returns raw counts with valid auth', async () => {
   const { response, data } = await request('/api/admin/variants/audit', {
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
   });
 
