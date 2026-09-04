@@ -895,6 +895,33 @@ test('/api/live returns hello event within 2s', async () => {
   });
 });
 
+test('author with + character is accepted (agent+gocha)', async () => {
+  const { response, data } = await request('/api/admin/log', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}` },
+    body: JSON.stringify({
+      body: 'Test entry with composite author',
+      kind: 'note',
+      author: 'agent+gocha',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.author, 'agent+gocha');
+
+  // Test PATCH as well
+  const { response: patchResponse } = await request(`/api/admin/log`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}` },
+    body: JSON.stringify({
+      id: data.id,
+      author: 'cursor+agent',
+    }),
+  });
+
+  assert.strictEqual(patchResponse.status, 200);
+});
+
 test('/api/live sends log event after POST /api/admin/log', async () => {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {

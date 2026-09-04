@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate author as non-empty slug up to 32 chars
-    if (!principal || principal.length === 0 || principal.length > 32 || !/^[a-z0-9_-]+$/i.test(principal)) {
+    if (!principal || principal.length === 0 || principal.length > 32 || !/^[a-z0-9_+-]{1,32}$/i.test(principal)) {
       return NextResponse.json({ error: 'invalid author' }, { status: 400 });
     }
 
