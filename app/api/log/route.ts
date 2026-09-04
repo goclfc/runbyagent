@@ -14,6 +14,7 @@ export async function GET(request: NextRequest) {
         le.body,
         le.kind,
         le.x_url,
+        le.author,
         le.created_at,
         p.slug as project_slug,
         p.name as project_name

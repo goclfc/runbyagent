@@ -12,6 +12,7 @@ export async function GET() {
         le.body,
         le.kind,
         le.x_url,
+        le.author,
         le.created_at,
         p.slug as project_slug,
         p.name as project_name,
@@ -51,7 +52,7 @@ export async function GET() {
           content_text: entry.body,
           url: entry.x_url || `${SITE_URL}/changelog#${entry.id}`,
           date_published: isoDate,
-          tags: [entry.kind, entry.project_slug].filter(Boolean),
+          tags: [entry.kind, entry.author, entry.project_slug].filter(Boolean),
         };
       }),
     };
