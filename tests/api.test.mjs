@@ -758,3 +758,207 @@ test('bot key works with research inbox', async () => {
   assert.strictEqual(data.name, 'Bot Research Doc');
   assert.strictEqual(data.count, 2);
 });
+
+// Library tests
+test('unpublished finding is absent from /api/library', async () => {
+  const { response, data } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}` },
+    body: JSON.stringify({
+      kind: 'finding',
+      name: 'Test Finding Unpublished',
+      summary: 'A test finding',
+      body_md: 'This is a test finding.',
+      lines: ['test line'],
+      published: false,
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  const docId = data.id;
+
+  // Should not appear in library
+  const { data: docs } = await request('/api/library');
+  const found = docs.find(d => d.name === 'Test Finding Unpublished');
+  assert.strictEqual(found, undefined, 'unpublished finding should not appear in library');
+
+  // Store for next test
+  process.env.TEST_LIBRARY_DOC_ID = docId;
+});
+
+test('PATCH to publish makes doc appear in library', async () => {
+  const docId = process.env.TEST_LIBRARY_DOC_ID;
+  
+  if (!docId) {
+    console.log('Skipping: no test doc id');
+    return;
+  }
+
+  const { response: patchResponse } = await request(`/api/research/${docId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}` },
+    body: JSON.stringify({ published: true }),
+  });
+
+  assert.strictEqual(patchResponse.status, 200);
+
+  // Should now appear in library
+  const { data: docs } = await request('/api/library');
+  const found = docs.find(d => d.name === 'Test Finding Unpublished');
+  assert.ok(found, 'published finding should appear in library');
+  
+  // Store slug for version test
+  process.env.TEST_LIBRARY_SLUG = found.slug;
+});
+
+test('version stored on body change', async () => {
+  const docId = process.env.TEST_LIBRARY_DOC_ID;
+  const slug = process.env.TEST_LIBRARY_SLUG;
+  
+  if (!docId || !slug) {
+    console.log('Skipping: no test doc id or slug');
+    return;
+  }
+
+  const { response: patchResponse } = await request(`/api/research/${docId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}` },
+    body: JSON.stringify({
+      body_md: 'Updated body content.',
+      summary: 'Updated summary',
+    }),
+  });
+
+  assert.strictEqual(patchResponse.status, 200);
+
+  // Check versions endpoint
+  const { data: versions } = await request(`/api/library/${slug}/versions`);
+  assert.ok(Array.isArray(versions), 'versions should be an array');
+  assert.ok(versions.length > 0, 'should have at least one version after update');
+});
+
+test('/api/live returns hello event within 2s', async () => {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('hello event not received within 2s'));
+    }, 2000);
+    
+    const controller = new AbortController();
+    
+    fetch(`${BASE}/api/live`, { signal: controller.signal })
+      .then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        function read() {
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              clearTimeout(timeout);
+              reject(new Error('stream ended without hello event'));
+              return;
+            }
+            
+            const text = decoder.decode(value);
+            
+            if (text.includes('event: hello')) {
+              const dataMatch = text.match(/data: (.+)/);
+              if (dataMatch) {
+                const data = JSON.parse(dataMatch[1]);
+                
+                assert.ok(typeof data.log_head === 'number', 'hello should have log_head');
+                assert.ok(typeof data.metrics === 'object', 'hello should have metrics');
+                
+                clearTimeout(timeout);
+                controller.abort();
+                resolve();
+                return;
+              }
+            }
+            
+            read();
+          }).catch(err => {
+            if (err.name !== 'AbortError') {
+              clearTimeout(timeout);
+              reject(err);
+            }
+          });
+        }
+        
+        read();
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          clearTimeout(timeout);
+          reject(err);
+        }
+      });
+  });
+});
+
+test('/api/live sends log event after POST /api/admin/log', async () => {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error('log event not received within 5s'));
+    }, 5000);
+    
+    const controller = new AbortController();
+    let helloReceived = false;
+    
+    fetch(`${BASE}/api/live`, { signal: controller.signal })
+      .then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        
+        function read() {
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              clearTimeout(timeout);
+              reject(new Error('stream ended'));
+              return;
+            }
+            
+            const text = decoder.decode(value);
+            
+            if (text.includes('event: hello') && !helloReceived) {
+              helloReceived = true;
+              
+              // Post a log entry
+              fetch(`${BASE}/api/admin/log`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${ADMIN_KEY}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  body: 'SSE test log entry',
+                  kind: 'note',
+                }),
+              });
+            }
+            
+            if (text.includes('event: log') && helloReceived) {
+              clearTimeout(timeout);
+              controller.abort();
+              resolve();
+              return;
+            }
+            
+            read();
+          }).catch(err => {
+            if (err.name !== 'AbortError') {
+              clearTimeout(timeout);
+              reject(err);
+            }
+          });
+        }
+        
+        read();
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') {
+          clearTimeout(timeout);
+          reject(err);
+        }
+      });
+  });
+});

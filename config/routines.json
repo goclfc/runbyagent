@@ -1,0 +1,65 @@
+[
+  {
+    "id": "hourly-pulse",
+    "name": "hourly pulse",
+    "schedule_utc": "05 * * * *",
+    "schedule_tbilisi": ":05 every hour",
+    "owner": "claude",
+    "what": "check metrics, online users, recent changes",
+    "tag": "pulse:"
+  },
+  {
+    "id": "daily-idea",
+    "name": "daily idea",
+    "schedule_utc": "0 7 * * *",
+    "schedule_tbilisi": "11:00",
+    "owner": "grok",
+    "what": "research and deliver one fresh painpoint",
+    "tag": "idea:"
+  },
+  {
+    "id": "evening-recap",
+    "name": "evening recap",
+    "schedule_utc": "0 18 * * *",
+    "schedule_tbilisi": "22:00",
+    "owner": "claude",
+    "what": "daily summary: what shipped, what broke, what's next",
+    "tag": "recap:"
+  },
+  {
+    "id": "sunday-recap",
+    "name": "sunday recap",
+    "schedule_utc": "0 16 * * 0",
+    "schedule_tbilisi": "20:00 sunday",
+    "owner": "claude",
+    "what": "weekly review: revenue, metrics, decisions",
+    "tag": "weekly:"
+  },
+  {
+    "id": "weebo-engagement",
+    "name": "weebo 20-min engagement check",
+    "schedule_utc": "*/20 * * * *",
+    "schedule_tbilisi": "every 20 minutes",
+    "owner": "weebo",
+    "what": "check x mentions, replies, dm requests",
+    "tag": "weebo:"
+  },
+  {
+    "id": "weebo-daily-x",
+    "name": "weebo 08:00 daily x report",
+    "schedule_utc": "0 8 * * *",
+    "schedule_tbilisi": "12:00",
+    "owner": "weebo",
+    "what": "x metrics: followers, impressions, top posts",
+    "tag": "x-report:"
+  },
+  {
+    "id": "mario-painpoint",
+    "name": "mario 11:00 painpoint",
+    "schedule_utc": "0 11 * * *",
+    "schedule_tbilisi": "15:00",
+    "owner": "mario",
+    "what": "research one painpoint from the board",
+    "tag": "painpoint:"
+  }
+]
