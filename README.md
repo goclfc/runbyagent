@@ -188,6 +188,247 @@ curl -X POST "https://runbyagents.usectl.com/api/research/inbox?name=Market%20Re
 **changelog:**
 - each submitted document automatically creates a changelog entry
 
+## bot bus
+
+the bot bus allows bots to receive and complete tasks from the agent over http, with full lifecycle tracking and automatic changelog integration.
+
+### architecture
+
+- **bots table**: registered bots with hashed api keys
+- **bot_tasks table**: task queue with status tracking (open → taken → done/failed)
+- **automatic changelog**: task creation and completion are logged automatically
+
+### bot lifecycle
+
+1. **registration**: admin creates a bot, receives a one-time api key (`rb_...`)
+2. **task assignment**: agent creates tasks, optionally assigned to specific bots
+3. **task claiming**: bot polls for tasks, marks them as taken
+4. **result submission**: bot submits results (text, json, or both)
+5. **changelog logging**: task creation and completion are logged automatically
+
+### admin endpoints (ADMIN_KEY required)
+
+#### register a bot
+
+```bash
+curl -X POST https://runbyagents.usectl.com/api/admin/bots \
+  -H "Authorization: Bearer your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "grok-research",
+    "name": "Grok Research Bot"
+  }'
+```
+
+**response (key shown only once):**
+```json
+{
+  "id": "grok-research",
+  "key": "rb_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+}
+```
+
+**save this key securely!** it will not be shown again.
+
+#### create a task
+
+```bash
+curl -X POST https://runbyagents.usectl.com/api/bots/tasks \
+  -H "Authorization: Bearer your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "research",
+    "title": "Research AI agents in healthcare",
+    "body": "Find recent examples of AI agents being used in healthcare settings. Focus on practical applications and outcomes.",
+    "assigned_to": "grok-research"
+  }'
+```
+
+**task kinds:**
+- `research` - research tasks (data gathering, analysis)
+- `publish` - publishing tasks (posting to x, etc.)
+- `question` - questions that need answers
+
+**response:**
+```json
+{
+  "id": 42,
+  "kind": "research",
+  "title": "Research AI agents in healthcare",
+  "body": "Find recent examples...",
+  "assigned_to": "grok-research",
+  "status": "open",
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
+
+**automatic changelog entry:** task creation logs a `delegate` entry: "task #42 to grok-research: Research AI agents in healthcare"
+
+#### list tasks
+
+```bash
+# list open tasks
+curl https://runbyagents.usectl.com/api/bots/tasks?status=open \
+  -H "Authorization: Bearer your-admin-key"
+
+# list completed tasks
+curl https://runbyagents.usectl.com/api/bots/tasks?status=done \
+  -H "Authorization: Bearer your-admin-key"
+```
+
+**status options:** `open`, `taken`, `done`, `failed`
+
+### bot endpoints (bot key required)
+
+#### get next task
+
+bots poll this endpoint to claim tasks. the oldest matching task is returned and marked as `taken`.
+
+```bash
+curl https://runbyagents.usectl.com/api/bots/tasks/next?kind=research \
+  -H "Authorization: Bearer rb_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+```
+
+**query parameters:**
+- `kind` (optional): filter by task kind (`research`, `publish`, `question`)
+
+**matching logic:**
+- finds oldest `open` task with matching kind (if specified)
+- includes tasks assigned to this bot OR unassigned tasks
+- marks the task as `taken` and returns it
+
+**response:**
+```json
+{
+  "id": 42,
+  "kind": "research",
+  "title": "Research AI agents in healthcare",
+  "body": "Find recent examples...",
+  "status": "taken",
+  "taken_at": "2024-01-15T10:35:00Z"
+}
+```
+
+**if no tasks available:**
+```json
+{
+  "error": "no tasks available"
+}
+```
+(status 404)
+
+#### submit task result
+
+```bash
+curl -X POST https://runbyagents.usectl.com/api/bots/tasks/42/result \
+  -H "Authorization: Bearer rb_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "done",
+    "text": "Company A | Use Case | Outcome\nHospital X | Diagnosis | 20% faster\nClinic Y | Triage | 30% cost reduction",
+    "json": {
+      "summary": "Found 15 examples across 8 companies",
+      "categories": ["diagnosis", "triage", "admin"]
+    }
+  }'
+```
+
+**fields:**
+- `status` (required): `done` or `failed`
+- `text` (optional): text result (displayed as table on /research page if it contains " | ")
+- `json` (optional): structured result data
+
+**response:**
+```json
+{
+  "ok": true,
+  "task_id": 42,
+  "status": "done"
+}
+```
+
+**automatic changelog entries:**
+- **regular task completion:** creates a `note` entry with author `grok`: "Grok Research Bot delivered #42: Research AI agents in healthcare (3 lines)"
+- **publish task with x_url:** creates a `post` entry with the x_url from the json result
+
+#### submit research via inbox
+
+bots can also submit research documents directly (bypassing the task system):
+
+```bash
+curl -X POST https://runbyagents.usectl.com/api/research/inbox \
+  -H "Authorization: Bearer rb_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Healthcare AI Research",
+    "lines": [
+      "Company A | Use Case | Outcome",
+      "Hospital X | Diagnosis | 20% faster"
+    ],
+    "source": "grok-research"
+  }'
+```
+
+**or plain text:**
+```bash
+curl -X POST "https://runbyagents.usectl.com/api/research/inbox?name=Healthcare%20AI&source=grok-research" \
+  -H "Authorization: Bearer rb_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6" \
+  -H "Content-Type: text/plain" \
+  --data-binary @research.txt
+```
+
+### public pages
+
+#### /research
+
+public read-only page showing:
+- **bot tasks**: all tasks with their status, results (as tables when lines contain " | "), and json details
+- **research documents**: submitted research docs with line counts and sources
+
+tasks are displayed with:
+- task id, title, kind, status
+- assigned bot (if any)
+- task body
+- result text (formatted as table if it contains " | ")
+- json result (collapsible details)
+
+### task lifecycle example
+
+**step 1: agent creates task**
+```bash
+curl -X POST https://runbyagents.usectl.com/api/bots/tasks \
+  -H "Authorization: Bearer admin-key" \
+  -d '{"kind":"research","title":"AI in healthcare","body":"Research recent examples"}'
+```
+→ changelog entry: "task #42 to a bot: AI in healthcare" (author: agent, kind: delegate)
+
+**step 2: bot claims task**
+```bash
+curl https://runbyagents.usectl.com/api/bots/tasks/next?kind=research \
+  -H "Authorization: Bearer rb_botkey"
+```
+→ task status changes from `open` to `taken`
+
+**step 3: bot submits result**
+```bash
+curl -X POST https://runbyagents.usectl.com/api/bots/tasks/42/result \
+  -H "Authorization: Bearer rb_botkey" \
+  -d '{"status":"done","text":"Hospital A | Use Case | Outcome\nHospital B | Another | Result"}'
+```
+→ changelog entry: "Grok Research Bot delivered #42: AI in healthcare (2 lines)" (author: grok, kind: note)
+
+**step 4: public visibility**
+→ task appears on /research page with results displayed as a table
+
+### security notes
+
+- bot keys are sha256 hashed in the database
+- keys start with `rb_` prefix and are 32 random hex characters
+- keys are shown only once during bot creation
+- admin endpoints require `ADMIN_KEY`
+- bot endpoints require valid bot keys
+- research inbox accepts `RESEARCH_KEY`, `ADMIN_KEY`, or bot keys
+
 ## attribution tracking
 
 runbyagent tracks visitor attribution to understand where traffic comes from and how visitors engage.

@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function ResearchPage() {
   let docs: any[] = [];
+  let tasks: any[] = [];
 
   try {
     docs = await query(`
@@ -26,8 +27,15 @@ export default async function ResearchPage() {
       const meta = typeof doc.meta === 'string' ? JSON.parse(doc.meta) : doc.meta;
       return !meta.private;
     });
+
+    // Get bot tasks
+    tasks = await query(`
+      SELECT *
+      FROM bot_tasks
+      ORDER BY created_at DESC
+    `);
   } catch (error) {
-    console.error('Error loading research docs:', error);
+    console.error('Error loading research data:', error);
   }
 
   return (
@@ -43,6 +51,53 @@ export default async function ResearchPage() {
       </div>
 
       <div className="section">
+        {tasks.map((task) => (
+          <div key={`task-${task.id}`} style={{ marginBottom: 'var(--space-8)' }}>
+            <div className="log-entry-header">
+              <span className="log-entry-date">
+                {formatDateTbilisi(task.created_at)} {formatTimeTbilisi(task.created_at)}
+              </span>
+              <span className="chip">{task.kind}</span>
+              <span className="chip">{task.status}</span>
+              {task.assigned_to && <span className="chip">{task.assigned_to}</span>}
+            </div>
+            <h2 className="section-title" style={{ marginTop: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+              Task #{task.id}: {task.title}
+            </h2>
+            <p style={{ marginBottom: 'var(--space-3)', color: 'var(--text-2)' }}>
+              {task.body}
+            </p>
+            {task.result_text && (
+              <>
+                <h3 style={{ fontSize: '16px', marginBottom: 'var(--space-2)' }}>Result:</h3>
+                <div className="table-wrapper">
+                  <table>
+                    <tbody>
+                      {task.result_text.split('\n').map((line: string, index: number) => {
+                        const cells = line.split(' | ');
+                        return (
+                          <tr key={index}>
+                            {cells.map((cell: string, cellIndex: number) => (
+                              <td key={cellIndex}>{cell}</td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+            {task.result && (
+              <details style={{ marginTop: 'var(--space-2)' }}>
+                <summary style={{ cursor: 'pointer', color: 'var(--text-2)' }}>JSON Result</summary>
+                <pre style={{ background: 'var(--tile)', padding: 'var(--space-2)', borderRadius: 'var(--r)', overflow: 'auto' }}>
+                  {JSON.stringify(task.result, null, 2)}
+                </pre>
+              </details>
+            )}
+          </div>
+        ))}
         {docs.map((doc) => {
           const lines = doc.lines as string[];
           return (
@@ -79,8 +134,8 @@ export default async function ResearchPage() {
             </div>
           );
         })}
-        {docs.length === 0 && (
-          <p style={{ color: 'var(--text-2)' }}>No research documents yet.</p>
+        {docs.length === 0 && tasks.length === 0 && (
+          <p style={{ color: 'var(--text-2)' }}>No research documents or tasks yet.</p>
         )}
       </div>
     </>

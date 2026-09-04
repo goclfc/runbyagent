@@ -1,23 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
 const MAX_LINES = 5000;
 const MAX_BODY_SIZE = 200 * 1024; // 200 KB
 
-function checkAuth(request: NextRequest): boolean {
+function hashKey(key: string): string {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
+
+async function checkAuth(request: NextRequest): Promise<boolean> {
   const authHeader = request.headers.get('authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return false;
+  }
+
+  const key = authHeader.substring(7);
+  
+  // Check if it's an admin or research key
   const researchKey = process.env.RESEARCH_KEY;
   const adminKey = process.env.ADMIN_KEY;
   
-  if (!authHeader) return false;
+  if (key === researchKey || key === adminKey) {
+    return true;
+  }
   
-  return authHeader === `Bearer ${researchKey}` || authHeader === `Bearer ${adminKey}`;
+  // Check if it's a bot key
+  if (key.startsWith('rb_')) {
+    const keyHash = hashKey(key);
+    const result = await query(`
+      SELECT id FROM bots WHERE key_hash = $1
+    `, [keyHash]);
+    return result.length > 0;
+  }
+  
+  return false;
 }
 
 export async function POST(request: NextRequest) {
-  if (!checkAuth(request)) {
+  const isAuthorized = await checkAuth(request);
+  if (!isAuthorized) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
