@@ -215,3 +215,9 @@ export function safeLocalPath(value: string | null | undefined): string {
   if (!value.startsWith('/') || value.startsWith('//')) return '/';
   return value;
 }
+
+/** same-site redirect with a relative Location. behind the usectl ingress request.url is the pod's
+ *  internal hostname, so absolute redirects built from it point at an unreachable host. */
+export function redirectTo(path: string, status: 302 | 303 = 302): Response {
+  return new Response(null, { status, headers: { Location: path } });
+}

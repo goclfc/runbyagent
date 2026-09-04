@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionUser, handoffToken, isAllowedReturnUrl } from '@/lib/auth';
+import { getSessionUser, handoffToken, isAllowedReturnUrl, redirectTo } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const user = await getSessionUser();
   if (!user) {
     const here = `/api/auth/handoff?return=${encodeURIComponent(target.toString())}`;
-    return NextResponse.redirect(new URL(`/login?return=${encodeURIComponent(here)}`, request.url), 302);
+    return redirectTo(`/login?return=${encodeURIComponent(here)}`);
   }
 
   target.searchParams.set('rba_token', handoffToken(user, target.origin));
