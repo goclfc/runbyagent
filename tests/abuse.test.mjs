@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { createHmac } from 'crypto';
 
 const BASE = process.env.BASE || 'http://localhost:3000';
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'test-admin-token';
+const ADMIN_KEY = process.env.ADMIN_KEY || 'test-admin-key';
 const HASH_SALT = process.env.HASH_SALT || process.env.ADMIN_KEY || 'default-salt-change-in-production';
 
 async function request(path, options = {}) {
@@ -245,7 +245,7 @@ test('ranking only uses trusted ratings (60s age threshold)', async () => {
 test('admin abuse endpoint returns top ips with valid auth', async () => {
   const { response, data } = await request('/api/admin/abuse', {
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
   });
 
@@ -264,6 +264,11 @@ test('admin reset endpoint requires auth', async () => {
 });
 
 test('admin reset endpoint clears variant data with valid auth', async () => {
+  if (!BASE.includes('localhost')) {
+    console.log('skipping destructive reset test (BASE must be localhost)');
+    return;
+  }
+
   // first add some data
   await request('/api/variants/08/rate', {
     method: 'POST',
@@ -282,13 +287,13 @@ test('admin reset endpoint clears variant data with valid auth', async () => {
     }),
   });
 
-  // now reset
+  // now reset with confirmation
   const { response, data } = await request('/api/admin/variants/reset', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
-    body: JSON.stringify({ slug: '08' }),
+    body: JSON.stringify({ slug: '08', confirm: 'reset-08' }),
   });
 
   assert.strictEqual(response.status, 200);
@@ -310,7 +315,7 @@ test('admin reset endpoint validates slug', async () => {
   const { response } = await request('/api/admin/variants/reset', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
     body: JSON.stringify({}),
   });
@@ -318,11 +323,25 @@ test('admin reset endpoint validates slug', async () => {
   assert.strictEqual(response.status, 400);
 });
 
+test('admin reset endpoint requires confirmation', async () => {
+  const { response, data } = await request('/api/admin/variants/reset', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({ slug: '01' }),
+  });
+
+  assert.strictEqual(response.status, 400);
+  assert.strictEqual(data.error, 'confirmation required');
+  assert.strictEqual(data.expected, 'reset-01');
+});
+
 test('admin reset endpoint returns 404 for invalid variant', async () => {
   const { response } = await request('/api/admin/variants/reset', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ADMIN_TOKEN}`,
+      'Authorization': `Bearer ${ADMIN_KEY}`,
     },
     body: JSON.stringify({ slug: 'nonexistent' }),
   });
@@ -349,4 +368,30 @@ test('ip deduplication limits picks per ip to 3', async () => {
   
   // the implementation maintains only the 3 most recent picks per ip
   // this is a database-level constraint that we have verified works by the successful responses
+});
+
+test('admin audit endpoint returns raw counts with valid auth', async () => {
+  const { response, data } = await request('/api/admin/variants/audit', {
+    headers: {
+      'Authorization': `Bearer ${ADMIN_KEY}`,
+    },
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.ok(Array.isArray(data.variants));
+  
+  data.variants.forEach(variant => {
+    assert.ok(typeof variant.slug === 'string');
+    assert.ok(typeof variant.rating_count === 'number');
+    assert.ok(typeof variant.trusted_rating_count === 'number');
+    assert.ok(typeof variant.pick_count === 'number');
+    assert.ok(typeof variant.comment_count === 'number');
+    assert.ok(typeof variant.visitor_metadata_count === 'number');
+  });
+});
+
+test('admin audit endpoint requires auth', async () => {
+  const { response } = await request('/api/admin/variants/audit');
+
+  assert.strictEqual(response.status, 401);
 });
