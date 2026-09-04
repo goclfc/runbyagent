@@ -35,6 +35,12 @@ export async function POST(request: NextRequest) {
 
     const task = result[0];
 
+    // Create first message (the task brief)
+    await query(`
+      INSERT INTO task_messages (task_id, author, body)
+      VALUES ($1, 'agent', $2)
+    `, [task.id, taskBody]);
+
     // Log changelog entry
     const botName = assigned_to || 'a bot';
     const logBody = `task #${task.id} to ${botName}: ${title}`;
@@ -57,18 +63,36 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status') || 'open';
+    const status = searchParams.get('status');
+    const waiting = searchParams.get('waiting');
 
-    if (!['open', 'taken', 'done', 'failed'].includes(status)) {
+    if (status && !['open', 'taken', 'done', 'failed'].includes(status)) {
       return NextResponse.json({ error: 'invalid status' }, { status: 400 });
+    }
+
+    if (waiting === 'agent') {
+      // Tasks where bot spoke last (agent needs to respond)
+      const tasks = await query(`
+        SELECT DISTINCT ON (bt.id) bt.*
+        FROM bot_tasks bt
+        JOIN task_messages tm ON tm.task_id = bt.id
+        WHERE bt.status IN ('open', 'taken')
+          AND tm.author != 'agent'
+          AND tm.author != 'gocha'
+          AND tm.created_at = (
+            SELECT MAX(created_at) FROM task_messages WHERE task_id = bt.id
+          )
+        ORDER BY bt.id, bt.created_at DESC
+      `);
+      return NextResponse.json(tasks);
     }
 
     const tasks = await query(`
       SELECT *
       FROM bot_tasks
-      WHERE status = $1
+      ${status ? 'WHERE status = $1' : ''}
       ORDER BY created_at DESC
-    `, [status]);
+    `, status ? [status] : []);
 
     return NextResponse.json(tasks);
   } catch (error) {

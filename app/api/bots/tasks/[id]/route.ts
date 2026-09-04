@@ -8,6 +8,12 @@ function hashKey(key: string): string {
   return crypto.createHash('sha256').update(key).digest('hex');
 }
 
+function checkAdminAuth(request: NextRequest): boolean {
+  const authHeader = request.headers.get('authorization');
+  const expectedAuth = `Bearer ${process.env.ADMIN_KEY}`;
+  return authHeader === expectedAuth;
+}
+
 async function checkBotAuth(request: NextRequest): Promise<string | null> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -21,7 +27,7 @@ async function checkBotAuth(request: NextRequest): Promise<string | null> {
 
   const keyHash = hashKey(key);
   const result = await query(`
-    SELECT id, name FROM bots WHERE key_hash = $1
+    SELECT id FROM bots WHERE key_hash = $1
   `, [keyHash]);
 
   if (result.length === 0) {
@@ -38,12 +44,14 @@ async function getBotName(botId: string): Promise<string> {
   return result.length > 0 ? result[0].name : botId;
 }
 
-export async function POST(
+export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const isAdmin = checkAdminAuth(request);
   const botId = await checkBotAuth(request);
-  if (!botId) {
+
+  if (!isAdmin && !botId) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -54,14 +62,7 @@ export async function POST(
       return NextResponse.json({ error: 'invalid task id' }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { text, json, status } = body;
-
-    if (!status || !['done', 'failed'].includes(status)) {
-      return NextResponse.json({ error: 'status must be done or failed' }, { status: 400 });
-    }
-
-    // Get task details
+    // Get task
     const taskResult = await query(`
       SELECT * FROM bot_tasks WHERE id = $1
     `, [taskId]);
@@ -72,38 +73,16 @@ export async function POST(
 
     const task = taskResult[0];
 
-    // Update task
-    await query(`
-      UPDATE bot_tasks
-      SET status = $1, result = $2, result_text = $3, done_at = NOW()
-      WHERE id = $4
-    `, [status, json ? JSON.stringify(json) : null, text || null, taskId]);
+    // Get all messages for this task
+    const messages = await query(`
+      SELECT * FROM task_messages
+      WHERE task_id = $1
+      ORDER BY created_at ASC
+    `, [taskId]);
 
-    // Get bot name
-    const botName = await getBotName(botId);
-
-    // Log changelog entry
-    if (status === 'done') {
-      // If it's a publish task with x_url in result, create a post entry
-      if (task.kind === 'publish' && json && json.x_url) {
-        await query(`
-          INSERT INTO log_entries (body, kind, x_url, author)
-          VALUES ($1, 'post', $2, 'grok')
-        `, [task.title, json.x_url]);
-      } else {
-        // Regular delivery note
-        const lineCount = text ? text.split('\n').length : 0;
-        const logBody = `${botName} delivered #${taskId}: ${task.title}${lineCount > 0 ? ` (${lineCount} lines)` : ''}`;
-        await query(`
-          INSERT INTO log_entries (body, kind, author)
-          VALUES ($1, 'note', 'grok')
-        `, [logBody]);
-      }
-    }
-
-    return NextResponse.json({ ok: true, task_id: taskId, status });
+    return NextResponse.json({ ...task, messages });
   } catch (error) {
-    console.error('Error submitting result:', error);
+    console.error('Error fetching task:', error);
     return NextResponse.json({ error: 'internal server error' }, { status: 500 });
   }
 }

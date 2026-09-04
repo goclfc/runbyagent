@@ -59,12 +59,14 @@ export async function POST(request: NextRequest) {
     let lines: string[] = [];
     let meta: any = null;
     let source: string | null = null;
+    let taskId: number | null = null;
 
     if (contentType.includes('application/json')) {
       const body = JSON.parse(bodyText);
       name = body.name || null;
       meta = body.meta || null;
       source = body.source || null;
+      taskId = body.task_id ? parseInt(body.task_id) : null;
 
       if (Array.isArray(body.lines)) {
         lines = body.lines;
@@ -77,6 +79,8 @@ export async function POST(request: NextRequest) {
       // Plain text body
       name = searchParams.get('name') || null;
       source = searchParams.get('source') || null;
+      const taskIdParam = searchParams.get('task_id');
+      taskId = taskIdParam ? parseInt(taskIdParam) : null;
       lines = bodyText.split('\n');
     } else {
       return NextResponse.json({ error: 'unsupported content type' }, { status: 415 });
@@ -98,6 +102,14 @@ export async function POST(request: NextRequest) {
 
     const doc = result[0];
     const count = lines.length;
+
+    // If task_id is provided, attach this doc to the task thread
+    if (taskId) {
+      await query(`
+        INSERT INTO task_messages (task_id, author, body, attachments)
+        VALUES ($1, 'agent', $2, $3)
+      `, [taskId, `Research document: ${name || 'untitled'}`, JSON.stringify({ research_doc_id: doc.id })]);
+    }
 
     // Log changelog entry
     const logBody = `research: ${name || 'untitled'}, ${count} lines${source ? ` from ${source}` : ''}`;

@@ -28,12 +28,21 @@ export default async function ResearchPage() {
       return !meta.private;
     });
 
-    // Get bot tasks
-    tasks = await query(`
-      SELECT *
-      FROM bot_tasks
+    // Get bot tasks with their messages
+    const tasksResult = await query(`
+      SELECT * FROM bot_tasks
       ORDER BY created_at DESC
     `);
+
+    // Get all messages for all tasks
+    for (const task of tasksResult) {
+      const messages = await query(`
+        SELECT * FROM task_messages
+        WHERE task_id = $1
+        ORDER BY created_at ASC
+      `, [task.id]);
+      tasks.push({ ...task, messages });
+    }
   } catch (error) {
     console.error('Error loading research data:', error);
   }
@@ -64,38 +73,70 @@ export default async function ResearchPage() {
             <h2 className="section-title" style={{ marginTop: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
               Task #{task.id}: {task.title}
             </h2>
-            <p style={{ marginBottom: 'var(--space-3)', color: 'var(--text-2)' }}>
-              {task.body}
-            </p>
-            {task.result_text && (
-              <>
-                <h3 style={{ fontSize: '16px', marginBottom: 'var(--space-2)' }}>Result:</h3>
-                <div className="table-wrapper">
-                  <table>
-                    <tbody>
-                      {task.result_text.split('\n').map((line: string, index: number) => {
-                        const cells = line.split(' | ');
-                        return (
-                          <tr key={index}>
-                            {cells.map((cell: string, cellIndex: number) => (
-                              <td key={cellIndex}>{cell}</td>
-                            ))}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+            
+            {/* Thread of messages */}
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              {task.messages && task.messages.map((msg: any, idx: number) => (
+                <div key={msg.id} style={{ 
+                  marginBottom: 'var(--space-3)', 
+                  paddingLeft: 'var(--space-3)',
+                  borderLeft: '2px solid var(--line)'
+                }}>
+                  <div className="log-entry-header" style={{ marginBottom: 'var(--space-1)' }}>
+                    <span className="chip">{msg.author}</span>
+                    <span className="log-entry-date">
+                      {formatTimeTbilisi(msg.created_at)}
+                    </span>
+                  </div>
+                  <div style={{ color: 'var(--text)' }}>
+                    {msg.body}
+                  </div>
+                  {msg.attachments && (
+                    <>
+                      {msg.attachments.research_doc_id && (
+                        <p style={{ marginTop: 'var(--space-1)', fontSize: '13px', color: 'var(--text-2)' }}>
+                          📎 Research doc #{msg.attachments.research_doc_id}
+                        </p>
+                      )}
+                      {msg.attachments.x_url && (
+                        <p style={{ marginTop: 'var(--space-1)' }}>
+                          <a href={msg.attachments.x_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--lime)' }}>
+                            View post →
+                          </a>
+                        </p>
+                      )}
+                      {!msg.attachments.research_doc_id && !msg.attachments.x_url && (
+                        <details style={{ marginTop: 'var(--space-1)' }}>
+                          <summary style={{ cursor: 'pointer', fontSize: '13px', color: 'var(--text-2)' }}>Attachments</summary>
+                          <pre style={{ background: 'var(--tile)', padding: 'var(--space-2)', borderRadius: 'var(--r)', overflow: 'auto', fontSize: '12px' }}>
+                            {JSON.stringify(msg.attachments, null, 2)}
+                          </pre>
+                        </details>
+                      )}
+                    </>
+                  )}
+                  {/* Show message body as table if it contains " | " */}
+                  {msg.body.includes(' | ') && (
+                    <div className="table-wrapper" style={{ marginTop: 'var(--space-2)' }}>
+                      <table>
+                        <tbody>
+                          {msg.body.split('\n').map((line: string, lineIdx: number) => {
+                            const cells = line.split(' | ');
+                            return (
+                              <tr key={lineIdx}>
+                                {cells.map((cell: string, cellIdx: number) => (
+                                  <td key={cellIdx}>{cell}</td>
+                                ))}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
-              </>
-            )}
-            {task.result && (
-              <details style={{ marginTop: 'var(--space-2)' }}>
-                <summary style={{ cursor: 'pointer', color: 'var(--text-2)' }}>JSON Result</summary>
-                <pre style={{ background: 'var(--tile)', padding: 'var(--space-2)', borderRadius: 'var(--r)', overflow: 'auto' }}>
-                  {JSON.stringify(task.result, null, 2)}
-                </pre>
-              </details>
-            )}
+              ))}
+            </div>
           </div>
         ))}
         {docs.map((doc) => {
