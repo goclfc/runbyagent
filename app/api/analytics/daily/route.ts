@@ -3,7 +3,11 @@ import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
-function fill30Days(data: { day: string; cents?: number; count?: number }[]): any[] {
+function dayKey(day: string | Date): string {
+  return typeof day === 'string' ? day.slice(0, 10) : day.toISOString().split('T')[0];
+}
+
+function fill30Days(data: { day: string | Date; cents?: number; count?: number }[]): any[] {
   const result: any[] = [];
   const today = new Date();
   
@@ -11,7 +15,7 @@ function fill30Days(data: { day: string; cents?: number; count?: number }[]): an
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dayStr = date.toISOString().split('T')[0];
-    const found = data.find(d => d.day === dayStr);
+    const found = data.find(d => dayKey(d.day) === dayStr);
     result.push({
       day: dayStr,
       revenue_cents: found?.cents ?? 0,
@@ -66,8 +70,8 @@ export async function GET(request: NextRequest) {
     const result = fill30Days(revenueDays);
     
     for (const day of result) {
-      const viewsData = viewsDays.find((v: any) => v.day === day.day);
-      const uniquesData = uniquesDays.find((u: any) => u.day === day.day);
+      const viewsData = viewsDays.find((v: any) => dayKey(v.day) === day.day);
+      const uniquesData = uniquesDays.find((u: any) => dayKey(u.day) === day.day);
       
       day.page_views = viewsData?.count ?? 0;
       day.unique_visitors = uniquesData?.count ?? 0;

@@ -16,15 +16,21 @@ export async function GET() {
     `);
 
     const today = new Date().toISOString().split('T')[0];
-    const analyticsResult = await query(`
+    // views and uniques come from different tables; aggregate each on its own
+    // (joining them multiplied every view by the number of visitor-day rows)
+    const viewsResult = await query(`
       SELECT 
-        COALESCE(SUM(CASE WHEN h.day = $1 THEN h.views ELSE 0 END), 0)::INTEGER as views_today,
-        COALESCE(SUM(h.views), 0)::INTEGER as views_total,
-        COALESCE(COUNT(DISTINCT CASE WHEN vd.day = $1 THEN vd.visitor_id END), 0)::INTEGER as uniques_today,
-        COALESCE(COUNT(DISTINCT vd.visitor_id), 0)::INTEGER as uniques_total
-      FROM hits h
-      FULL OUTER JOIN visitor_days vd ON 1=1
+        COALESCE(SUM(CASE WHEN day = $1 THEN views ELSE 0 END), 0)::INTEGER as views_today,
+        COALESCE(SUM(views), 0)::INTEGER as views_total
+      FROM hits
     `, [today]);
+    const uniquesResult = await query(`
+      SELECT 
+        COALESCE(COUNT(DISTINCT CASE WHEN day = $1 THEN visitor_id END), 0)::INTEGER as uniques_today,
+        COALESCE(COUNT(DISTINCT visitor_id), 0)::INTEGER as uniques_total
+      FROM visitor_days
+    `, [today]);
+    const analyticsResult = [{ ...viewsResult[0], ...uniquesResult[0] }];
 
     const onlineResult = await query<{ count: string }>(`
       SELECT COUNT(DISTINCT visitor_id)::INTEGER as count 

@@ -117,15 +117,21 @@ export default async function NumbersPage() {
     totals = totalsResult[0] || totals;
 
     const today = new Date().toISOString().split('T')[0];
-    const analyticsResult = await query(`
+    // views and uniques come from different tables; aggregate each on its own
+    // (joining them multiplied every view by the number of visitor-day rows)
+    const viewsResult = await query(`
       SELECT 
-        COALESCE(SUM(CASE WHEN h.day = $1 THEN h.views ELSE 0 END), 0)::INTEGER as views_today,
-        COALESCE(SUM(h.views), 0)::INTEGER as views_total,
-        COALESCE(COUNT(DISTINCT CASE WHEN vd.day = $1 THEN vd.visitor_id END), 0)::INTEGER as uniques_today,
-        COALESCE(COUNT(DISTINCT vd.visitor_id), 0)::INTEGER as uniques_total
-      FROM hits h
-      FULL OUTER JOIN visitor_days vd ON 1=1
+        COALESCE(SUM(CASE WHEN day = $1 THEN views ELSE 0 END), 0)::INTEGER as views_today,
+        COALESCE(SUM(views), 0)::INTEGER as views_total
+      FROM hits
     `, [today]);
+    const uniquesResult = await query(`
+      SELECT 
+        COALESCE(COUNT(DISTINCT CASE WHEN day = $1 THEN visitor_id END), 0)::INTEGER as uniques_today,
+        COALESCE(COUNT(DISTINCT visitor_id), 0)::INTEGER as uniques_total
+      FROM visitor_days
+    `, [today]);
+    const analyticsResult = [{ ...viewsResult[0], ...uniquesResult[0] }];
     
     const onlineResult = await query<{ count: string }>(`
       SELECT COUNT(DISTINCT visitor_id)::INTEGER as count 
@@ -179,14 +185,17 @@ export default async function NumbersPage() {
       LIMIT 1
     `);
     
-    const xTotalsResult = await query(`
-      SELECT 
-        COALESCE(SUM(xd.impressions), 0)::INTEGER as impressions_total,
-        COALESCE(SUM(xp.likes), 0)::INTEGER as likes_total,
-        COALESCE(SUM(xp.replies), 0)::INTEGER as replies_total
-      FROM x_daily xd
-      FULL OUTER JOIN x_posts xp ON 1=1
+    // same rule: one aggregate per table, never a cross join
+    const xImpressionsResult = await query(`
+      SELECT COALESCE(SUM(impressions), 0)::INTEGER as impressions_total FROM x_daily
     `);
+    const xPostsResult = await query(`
+      SELECT 
+        COALESCE(SUM(likes), 0)::INTEGER as likes_total,
+        COALESCE(SUM(replies), 0)::INTEGER as replies_total
+      FROM x_posts
+    `);
+    const xTotalsResult = [{ ...xImpressionsResult[0], ...xPostsResult[0] }];
     
     if (xFollowersResult.length > 0 || xTotalsResult.length > 0) {
       xMetrics = {
@@ -207,10 +216,8 @@ export default async function NumbersPage() {
             ELSE 'direct'
           END
         )) as source,
-        COUNT(DISTINCT v.id)::INTEGER as visitors,
-        COALESCE(SUM(h.views), 0)::INTEGER as views
+        COUNT(DISTINCT v.id)::INTEGER as visitors
       FROM visitors v
-      LEFT JOIN hits h ON h.day >= CURRENT_DATE - INTERVAL '7 days'
       WHERE v.first_seen >= CURRENT_DATE - INTERVAL '7 days'
       GROUP BY source
       ORDER BY visitors DESC
@@ -227,10 +234,8 @@ export default async function NumbersPage() {
             ELSE 'direct'
           END
         )) as source,
-        COUNT(DISTINCT v.id)::INTEGER as visitors,
-        COALESCE(SUM(h.views), 0)::INTEGER as views
+        COUNT(DISTINCT v.id)::INTEGER as visitors
       FROM visitors v
-      LEFT JOIN hits h ON h.day >= CURRENT_DATE - INTERVAL '30 days'
       WHERE v.first_seen >= CURRENT_DATE - INTERVAL '30 days'
       GROUP BY source
       ORDER BY visitors DESC
@@ -355,7 +360,6 @@ export default async function NumbersPage() {
                 <tr>
                   <th>source</th>
                   <th className="num">visitors</th>
-                  <th className="num">views</th>
                 </tr>
               </thead>
               <tbody>
@@ -368,7 +372,6 @@ export default async function NumbersPage() {
                       </div>
                     </td>
                     <td className="num">{row.visitors || 0}</td>
-                    <td className="num">{row.views || 0}</td>
                   </tr>
                 ))}
               </tbody>
@@ -386,7 +389,6 @@ export default async function NumbersPage() {
                 <tr>
                   <th>source</th>
                   <th className="num">visitors</th>
-                  <th className="num">views</th>
                 </tr>
               </thead>
               <tbody>
@@ -399,7 +401,6 @@ export default async function NumbersPage() {
                       </div>
                     </td>
                     <td className="num">{row.visitors || 0}</td>
-                    <td className="num">{row.views || 0}</td>
                   </tr>
                 ))}
               </tbody>
