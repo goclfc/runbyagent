@@ -11,10 +11,10 @@ function hashKey(key: string): string {
   return crypto.createHash('sha256').update(key).digest('hex');
 }
 
-async function checkAuth(request: NextRequest): Promise<boolean> {
+async function checkAuth(request: NextRequest): Promise<string | null> {
   const authHeader = request.headers.get('authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return false;
+    return null;
   }
 
   const key = authHeader.substring(7);
@@ -24,7 +24,7 @@ async function checkAuth(request: NextRequest): Promise<boolean> {
   const adminKey = process.env.ADMIN_KEY;
   
   if (key === researchKey || key === adminKey) {
-    return true;
+    return 'agent';
   }
   
   // Check if it's a bot key
@@ -33,15 +33,17 @@ async function checkAuth(request: NextRequest): Promise<boolean> {
     const result = await query(`
       SELECT id FROM bots WHERE key_hash = $1
     `, [keyHash]);
-    return result.length > 0;
+    if (result.length > 0) {
+      return result[0].id;
+    }
   }
   
-  return false;
+  return null;
 }
 
 export async function POST(request: NextRequest) {
-  const isAuthorized = await checkAuth(request);
-  if (!isAuthorized) {
+  const principal = await checkAuth(request);
+  if (!principal) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -59,14 +61,12 @@ export async function POST(request: NextRequest) {
     let lines: string[] = [];
     let meta: any = null;
     let source: string | null = null;
-    let taskId: number | null = null;
 
     if (contentType.includes('application/json')) {
       const body = JSON.parse(bodyText);
       name = body.name || null;
       meta = body.meta || null;
       source = body.source || null;
-      taskId = body.task_id ? parseInt(body.task_id) : null;
 
       if (Array.isArray(body.lines)) {
         lines = body.lines;
@@ -79,13 +79,12 @@ export async function POST(request: NextRequest) {
       // Plain text body
       name = searchParams.get('name') || null;
       source = searchParams.get('source') || null;
-      const taskIdParam = searchParams.get('task_id');
-      taskId = taskIdParam ? parseInt(taskIdParam) : null;
       lines = bodyText.split('\n');
     } else {
       return NextResponse.json({ error: 'unsupported content type' }, { status: 415 });
     }
 
+    // Validate before any INSERT
     if (lines.length === 0) {
       return NextResponse.json({ error: 'lines cannot be empty' }, { status: 400 });
     }
@@ -94,6 +93,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `too many lines (max ${MAX_LINES})` }, { status: 413 });
     }
 
+    // Validate author as non-empty slug up to 32 chars
+    if (!principal || principal.length === 0 || principal.length > 32 || !/^[a-z0-9_-]+$/i.test(principal)) {
+      return NextResponse.json({ error: 'invalid author' }, { status: 400 });
+    }
+
+    const isPrivate = meta && meta.private === true;
+
+    // Insert document
     const result = await query(`
       INSERT INTO research_docs (name, lines, meta, source)
       VALUES ($1, $2, $3, $4)
@@ -103,20 +110,14 @@ export async function POST(request: NextRequest) {
     const doc = result[0];
     const count = lines.length;
 
-    // If task_id is provided, attach this doc to the task thread
-    if (taskId) {
+    // Log changelog entry only for public docs
+    if (!isPrivate) {
+      const logBody = `research: ${name || 'untitled'}, ${count} lines${source ? ` from ${source}` : ''}`;
       await query(`
-        INSERT INTO task_messages (task_id, author, body, attachments)
-        VALUES ($1, 'agent', $2, $3)
-      `, [taskId, `Research document: ${name || 'untitled'}`, JSON.stringify({ research_doc_id: doc.id })]);
+        INSERT INTO log_entries (body, kind, author)
+        VALUES ($1, 'note', $2)
+      `, [logBody, principal]);
     }
-
-    // Log changelog entry
-    const logBody = `research: ${name || 'untitled'}, ${count} lines${source ? ` from ${source}` : ''}`;
-    await query(`
-      INSERT INTO log_entries (body, kind)
-      VALUES ($1, 'note')
-    `, [logBody]);
 
     return NextResponse.json({
       id: doc.id,

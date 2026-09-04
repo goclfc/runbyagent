@@ -28,8 +28,8 @@ export async function POST(request: NextRequest) {
     }
 
     const logAuthor = author || 'agent';
-    if (!['agent', 'agent+gocha', 'gocha', 'cursor', 'grok'].includes(logAuthor)) {
-      return NextResponse.json({ error: 'invalid author' }, { status: 400 });
+    if (!logAuthor || logAuthor.length === 0 || logAuthor.length > 32 || !/^[a-z0-9_-]+$/i.test(logAuthor)) {
+      return NextResponse.json({ error: 'invalid author (must be non-empty slug up to 32 chars)' }, { status: 400 });
     }
 
     let projectId = null;
@@ -74,8 +74,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'invalid kind' }, { status: 400 });
     }
 
-    if (author && !['agent', 'agent+gocha', 'gocha', 'cursor', 'grok'].includes(author)) {
-      return NextResponse.json({ error: 'invalid author' }, { status: 400 });
+    if (author && (!author || author.length === 0 || author.length > 32 || !/^[a-z0-9_-]+$/i.test(author))) {
+      return NextResponse.json({ error: 'invalid author (must be non-empty slug up to 32 chars)' }, { status: 400 });
     }
 
     const updates: string[] = [];

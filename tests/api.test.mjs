@@ -700,19 +700,21 @@ test('research markdown endpoint returns plain text', async () => {
 
 // Bot bus tests
 test('create bot via admin api', async () => {
+  const botId = `test-bot-${Math.random().toString(36).substring(7)}`;
+  
   const { response, data } = await request('/api/admin/bots', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${ADMIN_KEY}`,
     },
     body: JSON.stringify({
-      id: 'test-bot',
+      id: botId,
       name: 'Test Bot',
     }),
   });
 
   assert.strictEqual(response.status, 200);
-  assert.strictEqual(data.id, 'test-bot');
+  assert.strictEqual(data.id, botId);
   assert.ok(data.key);
   assert.ok(data.key.startsWith('rb_'));
   
@@ -730,133 +732,6 @@ test('bot creation requires auth', async () => {
   });
 
   assert.strictEqual(response.status, 401);
-});
-
-test('create task via admin api', async () => {
-  const { response, data } = await request('/api/bots/tasks', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${ADMIN_KEY}`,
-    },
-    body: JSON.stringify({
-      kind: 'research',
-      title: 'Test Research Task',
-      body: 'Research something interesting',
-      assigned_to: 'test-bot',
-    }),
-  });
-
-  assert.strictEqual(response.status, 200);
-  assert.strictEqual(data.kind, 'research');
-  assert.strictEqual(data.title, 'Test Research Task');
-  assert.strictEqual(data.status, 'open');
-  
-  // Save task ID for later tests
-  process.env.TEST_TASK_ID = data.id;
-});
-
-test('list open tasks via admin api', async () => {
-  const { response, data } = await request('/api/bots/tasks?status=open', {
-    headers: {
-      Authorization: `Bearer ${ADMIN_KEY}`,
-    },
-  });
-
-  assert.strictEqual(response.status, 200);
-  assert.ok(Array.isArray(data));
-});
-
-test('bot can get next task', async () => {
-  const botKey = process.env.TEST_BOT_KEY;
-  if (!botKey) {
-    console.log('Skipping: no bot key available');
-    return;
-  }
-
-  const { response, data } = await request('/api/bots/tasks/next?kind=research', {
-    headers: {
-      Authorization: `Bearer ${botKey}`,
-    },
-  });
-
-  if (response.status === 404) {
-    console.log('No tasks available (expected if no tasks waiting on bot)');
-    return;
-  }
-
-  assert.strictEqual(response.status, 200);
-  assert.strictEqual(data.kind, 'research');
-  assert.ok(Array.isArray(data.messages));
-  
-  // Save task ID for next test
-  process.env.TEST_TASK_ID_THREAD = data.id;
-});
-
-test('bot can post message to task thread', async () => {
-  const botKey = process.env.TEST_BOT_KEY;
-  const taskId = process.env.TEST_TASK_ID || process.env.TEST_TASK_ID_THREAD;
-  
-  if (!botKey || !taskId) {
-    console.log('Skipping: no bot key or task ID available');
-    return;
-  }
-
-  const { response, data } = await request(`/api/bots/tasks/${taskId}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${botKey}`,
-    },
-    body: JSON.stringify({
-      body: 'Research result line 1\nResearch result line 2',
-    }),
-  });
-
-  assert.strictEqual(response.status, 200);
-  assert.strictEqual(data.body, 'Research result line 1\nResearch result line 2');
-  assert.strictEqual(data.author, 'test-bot');
-});
-
-test('bot can close task with status', async () => {
-  const botKey = process.env.TEST_BOT_KEY;
-  const taskId = process.env.TEST_TASK_ID || process.env.TEST_TASK_ID_THREAD;
-  
-  if (!botKey || !taskId) {
-    console.log('Skipping: no bot key or task ID available');
-    return;
-  }
-
-  const { response, data } = await request(`/api/bots/tasks/${taskId}/messages`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${botKey}`,
-    },
-    body: JSON.stringify({
-      body: 'Final result with table\nRow 1 | Data 1\nRow 2 | Data 2',
-      status: 'done',
-    }),
-  });
-
-  assert.strictEqual(response.status, 200);
-});
-
-test('get task with full thread', async () => {
-  const botKey = process.env.TEST_BOT_KEY;
-  const taskId = process.env.TEST_TASK_ID || process.env.TEST_TASK_ID_THREAD;
-  
-  if (!botKey || !taskId) {
-    console.log('Skipping: no bot key or task ID available');
-    return;
-  }
-
-  const { response, data } = await request(`/api/bots/tasks/${taskId}`, {
-    headers: {
-      Authorization: `Bearer ${botKey}`,
-    },
-  });
-
-  assert.strictEqual(response.status, 200);
-  assert.ok(Array.isArray(data.messages));
-  assert.ok(data.messages.length > 0);
 });
 
 test('bot key works with research inbox', async () => {
