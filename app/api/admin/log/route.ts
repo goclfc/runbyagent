@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { project, body: logBody, kind, x_url, at } = body;
+    const { project, body: logBody, kind, x_url, at, author } = body;
 
     if (!logBody) {
       return NextResponse.json({ error: 'body is required' }, { status: 400 });
@@ -25,6 +25,11 @@ export async function POST(request: NextRequest) {
     const logKind = kind || 'note';
     if (!['prompt', 'decision', 'build', 'fix', 'post', 'delegate', 'ship', 'kill', 'numbers', 'note'].includes(logKind)) {
       return NextResponse.json({ error: 'invalid kind' }, { status: 400 });
+    }
+
+    const logAuthor = author || 'agent';
+    if (!logAuthor || logAuthor.length === 0 || logAuthor.length > 32 || !/^[a-z0-9_-]+$/i.test(logAuthor)) {
+      return NextResponse.json({ error: 'invalid author (must be non-empty slug up to 32 chars)' }, { status: 400 });
     }
 
     let projectId = null;
@@ -40,10 +45,10 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await query(`
-      INSERT INTO log_entries (project_id, body, kind, x_url, created_at)
-      VALUES ($1, $2, $3, $4, ${at ? '$5' : 'NOW()'})
+      INSERT INTO log_entries (project_id, body, kind, x_url, created_at, author)
+      VALUES ($1, $2, $3, $4, ${at ? '$5' : 'NOW()'}, ${at ? '$6' : '$5'})
       RETURNING *
-    `, at ? [projectId, logBody, logKind, x_url, at] : [projectId, logBody, logKind, x_url]);
+    `, at ? [projectId, logBody, logKind, x_url, at, logAuthor] : [projectId, logBody, logKind, x_url, logAuthor]);
 
     return NextResponse.json(result[0]);
   } catch (error) {
@@ -59,7 +64,7 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, body: logBody, kind, x_url, at } = body;
+    const { id, body: logBody, kind, x_url, at, author } = body;
 
     if (!id) {
       return NextResponse.json({ error: 'id is required' }, { status: 400 });
@@ -67,6 +72,10 @@ export async function PATCH(request: NextRequest) {
 
     if (kind && !['prompt', 'decision', 'build', 'fix', 'post', 'delegate', 'ship', 'kill', 'numbers', 'note'].includes(kind)) {
       return NextResponse.json({ error: 'invalid kind' }, { status: 400 });
+    }
+
+    if (author && (!author || author.length === 0 || author.length > 32 || !/^[a-z0-9_-]+$/i.test(author))) {
+      return NextResponse.json({ error: 'invalid author (must be non-empty slug up to 32 chars)' }, { status: 400 });
     }
 
     const updates: string[] = [];
@@ -88,6 +97,10 @@ export async function PATCH(request: NextRequest) {
     if (at !== undefined) {
       updates.push(`created_at = $${paramCount++}`);
       values.push(at);
+    }
+    if (author !== undefined) {
+      updates.push(`author = $${paramCount++}`);
+      values.push(author);
     }
 
     if (updates.length === 0) {

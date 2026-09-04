@@ -60,6 +60,7 @@ usectl project create runbyagent --database
 
 ```bash
 usectl env set ADMIN_KEY=your-secret-admin-key
+usectl env set RESEARCH_KEY=your-secret-research-key
 usectl env set CRON_SECRET=your-secret-cron-key
 usectl env set STRIPE_SECRET_KEY=sk_test_...
 usectl env set PAINBOARD_URL=https://painboard.example.com
@@ -128,6 +129,96 @@ all admin routes require `Authorization: Bearer <ADMIN_KEY>` header.
 - `POST /api/admin/x/posts` - bulk upsert x posts with metrics
 - `POST /api/admin/link` - create or update tracked short link
 - `GET /api/admin/analytics?days=7` - get attribution analytics data
+
+## research inbox
+
+the research inbox allows automated bots to deliver research documents directly into the platform.
+
+### endpoints
+
+- `POST /api/research/inbox` - submit a research document (requires `RESEARCH_KEY` or `ADMIN_KEY`)
+- `GET /api/research` - list all research documents (requires `ADMIN_KEY`)
+- `GET /api/research/[id]` - get a specific document as JSON (requires `ADMIN_KEY`)
+- `GET /api/research/[id]/md` - get document lines as plain text (requires `ADMIN_KEY`)
+- `GET /research` - public page displaying all non-private research documents
+
+### submitting research
+
+**json format** (with array of lines):
+```bash
+curl -X POST https://runbyagents.usectl.com/api/research/inbox \
+  -H "Authorization: Bearer your-research-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Market Research",
+    "lines": ["line 1", "line 2", "line 3"],
+    "source": "grok-bot",
+    "meta": {"private": false}
+  }'
+```
+
+**json format** (with string, split on newlines):
+```bash
+curl -X POST https://runbyagents.usectl.com/api/research/inbox \
+  -H "Authorization: Bearer your-research-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Market Research",
+    "lines": "line 1\nline 2\nline 3",
+    "source": "grok-bot"
+  }'
+```
+
+**plain text format**:
+```bash
+curl -X POST "https://runbyagents.usectl.com/api/research/inbox?name=Market%20Research&source=grok-bot" \
+  -H "Authorization: Bearer your-research-key" \
+  -H "Content-Type: text/plain" \
+  --data-binary @research.txt
+```
+
+**limits:**
+- max 5000 lines per document
+- max 200 KB body size
+
+**privacy:**
+- set `meta.private: true` to hide a document from the public `/research` page
+- all documents are accessible via the admin API regardless of privacy setting
+
+**changelog:**
+- each submitted document automatically creates a changelog entry (except for private docs)
+- author is set to the principal that posted it ('agent' for admin/research key, bot id for bot keys)
+
+## bot registration
+
+bots can be registered to obtain API keys for use with the research inbox and other bot-enabled endpoints.
+
+### register a bot
+
+```bash
+curl -X POST https://runbyagents.usectl.com/api/admin/bots \
+  -H "Authorization: Bearer your-admin-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "grok-research",
+    "name": "Grok Research Bot"
+  }'
+```
+
+**response (key shown only once):**
+```json
+{
+  "id": "grok-research",
+  "key": "rb_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"
+}
+```
+
+**save this key securely!** it will not be shown again.
+
+**bot keys:**
+- format: `rb_` + 32 random hex characters
+- sha256 hashed in database
+- can be used with research inbox and other bot endpoints
 
 ## attribution tracking
 

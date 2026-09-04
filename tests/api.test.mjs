@@ -502,3 +502,259 @@ test('analytics admin endpoint returns data', async () => {
   assert.ok(typeof data.funnel === 'object');
   assert.ok(Array.isArray(data.links));
 });
+
+const RESEARCH_KEY = process.env.RESEARCH_KEY || 'test-research-key';
+
+test('research inbox accepts json with array of lines', async () => {
+  const { response, data } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEARCH_KEY}`,
+    },
+    body: JSON.stringify({
+      name: 'Test Research',
+      lines: ['line 1', 'line 2', 'line 3'],
+      source: 'test-bot',
+      meta: { test: true },
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.name, 'Test Research');
+  assert.strictEqual(data.count, 3);
+  assert.ok(typeof data.id === 'number');
+});
+
+test('research inbox accepts json with string lines', async () => {
+  const { response, data } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEARCH_KEY}`,
+    },
+    body: JSON.stringify({
+      name: 'Test with String',
+      lines: 'line 1\nline 2\nline 3',
+      source: 'test-bot',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.name, 'Test with String');
+  assert.strictEqual(data.count, 3);
+});
+
+test('research inbox accepts plain text', async () => {
+  const { response, data } = await request('/api/research/inbox?name=Plain%20Text%20Doc&source=text-bot', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEARCH_KEY}`,
+      'Content-Type': 'text/plain',
+    },
+    body: 'line 1\nline 2\nline 3',
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.name, 'Plain Text Doc');
+  assert.strictEqual(data.count, 3);
+});
+
+test('research inbox accepts admin key', async () => {
+  const { response, data } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      name: 'Admin Test',
+      lines: ['line 1'],
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.count, 1);
+});
+
+test('research inbox requires auth', async () => {
+  const { response } = await request('/api/research/inbox', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'No Auth',
+      lines: ['line 1'],
+    }),
+  });
+
+  assert.strictEqual(response.status, 401);
+});
+
+test('research inbox rejects too many lines', async () => {
+  const manyLines = Array(5001).fill('line');
+  const { response } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEARCH_KEY}`,
+    },
+    body: JSON.stringify({
+      name: 'Too Many Lines',
+      lines: manyLines,
+    }),
+  });
+
+  assert.strictEqual(response.status, 413);
+});
+
+test('research inbox rejects empty lines', async () => {
+  const { response } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEARCH_KEY}`,
+    },
+    body: JSON.stringify({
+      name: 'Empty',
+      lines: [],
+    }),
+  });
+
+  assert.strictEqual(response.status, 400);
+});
+
+test('research list endpoint requires auth', async () => {
+  const { response } = await request('/api/research');
+
+  assert.strictEqual(response.status, 401);
+});
+
+test('research list endpoint returns docs', async () => {
+  const { response, data } = await request('/api/research', {
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.ok(Array.isArray(data));
+});
+
+test('research get endpoint requires auth', async () => {
+  const { response } = await request('/api/research/1');
+
+  assert.strictEqual(response.status, 401);
+});
+
+test('research get endpoint returns doc', async () => {
+  // First create a doc
+  const { data: created } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEARCH_KEY}`,
+    },
+    body: JSON.stringify({
+      name: 'Get Test',
+      lines: ['line 1', 'line 2'],
+      source: 'test',
+    }),
+  });
+
+  // Then fetch it
+  const { response, data } = await request(`/api/research/${created.id}`, {
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.name, 'Get Test');
+  assert.ok(Array.isArray(data.lines));
+  assert.strictEqual(data.lines.length, 2);
+});
+
+test('research markdown endpoint requires auth', async () => {
+  const res = await fetch(`${process.env.BASE || 'http://localhost:3000'}/api/research/1/md`);
+  assert.strictEqual(res.status, 401);
+});
+
+test('research markdown endpoint returns plain text', async () => {
+  // First create a doc
+  const { data: created } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEARCH_KEY}`,
+    },
+    body: JSON.stringify({
+      name: 'Markdown Test',
+      lines: ['line 1', 'line 2', 'line 3'],
+    }),
+  });
+
+  // Then fetch it as markdown
+  const res = await fetch(`${process.env.BASE || 'http://localhost:3000'}/api/research/${created.id}/md`, {
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+  });
+
+  assert.strictEqual(res.status, 200);
+  assert.ok(res.headers.get('content-type')?.includes('text/plain'));
+  const text = await res.text();
+  assert.strictEqual(text, 'line 1\nline 2\nline 3');
+});
+
+// Bot bus tests
+test('create bot via admin api', async () => {
+  const botId = `test-bot-${Math.random().toString(36).substring(7)}`;
+  
+  const { response, data } = await request('/api/admin/bots', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${ADMIN_KEY}`,
+    },
+    body: JSON.stringify({
+      id: botId,
+      name: 'Test Bot',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.id, botId);
+  assert.ok(data.key);
+  assert.ok(data.key.startsWith('rb_'));
+  
+  // Save the key for later tests
+  process.env.TEST_BOT_KEY = data.key;
+});
+
+test('bot creation requires auth', async () => {
+  const { response } = await request('/api/admin/bots', {
+    method: 'POST',
+    body: JSON.stringify({
+      id: 'another-bot',
+      name: 'Another Bot',
+    }),
+  });
+
+  assert.strictEqual(response.status, 401);
+});
+
+test('bot key works with research inbox', async () => {
+  const botKey = process.env.TEST_BOT_KEY;
+  
+  if (!botKey) {
+    console.log('Skipping: no bot key available');
+    return;
+  }
+
+  const { response, data } = await request('/api/research/inbox', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${botKey}`,
+    },
+    body: JSON.stringify({
+      name: 'Bot Research Doc',
+      lines: ['line 1', 'line 2'],
+      source: 'test-bot',
+    }),
+  });
+
+  assert.strictEqual(response.status, 200);
+  assert.strictEqual(data.name, 'Bot Research Doc');
+  assert.strictEqual(data.count, 2);
+});

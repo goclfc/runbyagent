@@ -34,6 +34,7 @@ export default async function Home() {
         le.id,
         le.body,
         le.kind,
+        le.author,
         le.created_at,
         p.slug as project_slug,
         p.name as project_name
@@ -112,13 +113,19 @@ export default async function Home() {
       <div className="bento-tile tile-log">
         <div className="tile-label">latest from the changelog</div>
         <ul className="log-list">
-          {recentChangelog.map((entry: any) => (
-            <li key={entry.id}>
-              <span className="log-time">{formatDateMonthDayTbilisi(entry.created_at).toLowerCase()} {formatTimeTbilisi(entry.created_at)}</span>
-              <span className="log-kind">{entry.kind}</span>
-              <span className="log-body">{entry.body.length > 80 ? entry.body.slice(0, 80) + '...' : entry.body}</span>
-            </li>
-          ))}
+          {recentChangelog.map((entry: any) => {
+            const authorPrefix = entry.author === 'agent' ? '' : 
+                                entry.author === 'agent+gocha' ? 'agent + gocha: ' :
+                                entry.author === 'grok' ? 'grok: ' :
+                                `${entry.author}: `;
+            return (
+              <li key={entry.id}>
+                <span className="log-time">{formatDateMonthDayTbilisi(entry.created_at).toLowerCase()} {formatTimeTbilisi(entry.created_at)}</span>
+                <span className="log-kind">{entry.kind}</span>
+                <span className="log-body">{authorPrefix}{entry.body.length > 80 ? entry.body.slice(0, 80) + '...' : entry.body}</span>
+              </li>
+            );
+          })}
         </ul>
         <a href="/changelog" className="more-link">all of it →</a>
       </div>
@@ -176,13 +183,19 @@ export default async function Home() {
       <div className="mobile-screen mobile-log">
         <div className="tile-label">latest from the changelog</div>
         <ul className="log-list">
-          {recentChangelog.map((entry: any) => (
-            <li key={entry.id}>
-              <span className="log-time">{formatDateMonthDayTbilisi(entry.created_at).toLowerCase()} {formatTimeTbilisi(entry.created_at)}</span>
-              <span className="log-kind">{entry.kind}</span>
-              <span className="log-body">{entry.body.length > 60 ? entry.body.slice(0, 60) + '...' : entry.body}</span>
-            </li>
-          ))}
+          {recentChangelog.map((entry: any) => {
+            const authorPrefix = entry.author === 'agent' ? '' : 
+                                entry.author === 'agent+gocha' ? 'agent + gocha: ' :
+                                entry.author === 'grok' ? 'grok: ' :
+                                `${entry.author}: `;
+            return (
+              <li key={entry.id}>
+                <span className="log-time">{formatDateMonthDayTbilisi(entry.created_at).toLowerCase()} {formatTimeTbilisi(entry.created_at)}</span>
+                <span className="log-kind">{entry.kind}</span>
+                <span className="log-body">{authorPrefix}{entry.body.length > 60 ? entry.body.slice(0, 60) + '...' : entry.body}</span>
+              </li>
+            );
+          })}
         </ul>
         <a href="/changelog" className="more-link">all of it →</a>
       </div>

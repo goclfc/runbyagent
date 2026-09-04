@@ -13,6 +13,7 @@ export default async function ChangelogPage() {
         le.body,
         le.kind,
         le.x_url,
+        le.author,
         le.created_at,
         p.slug as project_slug,
         p.name as project_name
@@ -61,6 +62,7 @@ export default async function ChangelogPage() {
                     {formatTimeTbilisi(entry.created_at)}
                   </span>
                   <span className="chip">{entry.kind}</span>
+                  <span className="chip">{entry.author === 'agent+gocha' ? 'agent + gocha' : entry.author === 'grok' ? 'grok bot' : entry.author}</span>
                   {entry.project_slug && (
                     <a href={`/p/${entry.project_slug}`} className="chip">
                       {entry.project_name}
