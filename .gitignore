@@ -30,3 +30,4 @@ yarn-error.log*
 .vercel
 *.tsbuildinfo
 .cursor-agent.json
+.claude/
