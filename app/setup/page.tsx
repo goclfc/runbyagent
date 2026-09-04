@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import fs from 'fs';
 import path from 'path';
+import { renderMarkdown } from '@/lib/markdown';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,17 +116,7 @@ export default async function SetupPage() {
 
       <div className="section">
         {doc?.body_md ? (
-          <div className="markdown-content" style={{ marginBottom: 'var(--space-8)' }}>
-            {doc.body_md.split('\n\n').map((para: string, i: number) => {
-              if (para.startsWith('# ')) {
-                return <h2 key={i} className="section-title">{para.substring(2)}</h2>;
-              }
-              if (para.startsWith('## ')) {
-                return <h3 key={i} style={{ marginTop: 'var(--space-4)', marginBottom: 'var(--space-2)', fontSize: '16px' }}>{para.substring(3)}</h3>;
-              }
-              return <p key={i} style={{ marginBottom: 'var(--space-3)' }}>{para}</p>;
-            })}
-          </div>
+          <div className="doc-body markdown" style={{ marginBottom: 'var(--space-8)' }} dangerouslySetInnerHTML={{ __html: renderMarkdown(doc.body_md) }} />
         ) : (
           <div style={{ marginBottom: 'var(--space-8)', color: 'var(--text-2)', fontStyle: 'italic' }}>
             <p>the setup article is being written by the agent; check back soon.</p>

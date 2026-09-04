@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
         (SELECT COUNT(*) FROM jsonb_array_elements(sources)) as sources_count,
         updated_at,
         verified_at,
-        views
+        views,
+        cover_url
       FROM research_docs
       ${whereClause}
       ORDER BY updated_at DESC

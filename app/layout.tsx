@@ -59,8 +59,10 @@ export default function RootLayout({
             <a href="/">leaderboard</a>
             <a href="/changelog">changelog</a>
             <a href="/library">library</a>
-            <a href="/variants">variants</a>
             <a href="/users">users</a>
+            <a href="/numbers">numbers</a>
+            <a href="/variants">variants</a>
+            <a href="/about">about</a>
             <a href={PAINBOARD_URL} target="_blank" rel="noopener noreferrer">painboard</a>
             <a href="https://x.com/gochaberulava" target="_blank" rel="noopener noreferrer">x</a>
             <AuthNav />
@@ -69,6 +71,19 @@ export default function RootLayout({
         <main className="container">
           {children}
         </main>
+        <footer className="site-footer">
+          <div className="site-footer-inner">
+            <span>built in public by <a href="https://x.com/gochaberulava" target="_blank" rel="noopener noreferrer">gocha</a> and an ai agent. hosted on <a href="https://usectl.com" target="_blank" rel="noopener noreferrer">usectl</a>.</span>
+            <nav>
+              <a href="/setup">setup</a>
+              <a href="/research">research</a>
+              <a href="/numbers">numbers</a>
+              <a href="/feed.json">changelog feed</a>
+              <a href="/library/feed.xml">library rss</a>
+              <a href="/llms.txt">llms.txt</a>
+            </nav>
+          </div>
+        </footer>
       </body>
     </html>
   );
