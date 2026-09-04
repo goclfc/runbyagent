@@ -14,10 +14,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { slug } = body;
+    const { slug, confirm } = body;
 
     if (!slug || typeof slug !== 'string') {
       return NextResponse.json({ error: 'slug is required' }, { status: 400 });
+    }
+
+    const expectedConfirm = `reset-${slug}`;
+    if (confirm !== expectedConfirm) {
+      return NextResponse.json({ 
+        error: 'confirmation required', 
+        expected: expectedConfirm 
+      }, { status: 400 });
     }
 
     // Get variant ID
@@ -32,6 +40,12 @@ export async function POST(request: NextRequest) {
     await query('DELETE FROM variant_picks WHERE variant_id = $1', [variantId]);
     await query('DELETE FROM variant_comments WHERE variant_id = $1', [variantId]);
     await query('DELETE FROM variant_pick_ips WHERE variant_id = $1', [variantId]);
+
+    // Log the reset as a changelog entry
+    await query(
+      `INSERT INTO log_entries (kind, message, created_at) VALUES ('fix', $1, NOW())`,
+      [`admin reset variant ${slug} (all ratings, picks, comments deleted)`]
+    );
 
     return NextResponse.json({ success: true, slug, reset: true });
   } catch (error) {
