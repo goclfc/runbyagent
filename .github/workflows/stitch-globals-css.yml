@@ -1,0 +1,36 @@
+name: stitch-globals-css
+on:
+  push:
+    branches: [cursor/open-questions-117f]
+jobs:
+  stitch:
+    if: github.event.head_commit.message != 'wire questions into nav, styles, readme, and tests'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: cursor/open-questions-117f
+      - name: Concatenate split CSS into exact globals.css
+        run: |
+          set -euo pipefail
+          test -f app/globals-tail.css
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("app/globals.css").read_bytes()
+          t = Path("app/globals-tail.css").read_bytes()
+          imp = b'@import "./globals-tail.css";\n'
+          if not p.endswith(imp):
+              raise SystemExit("globals.css does not end with expected import")
+          out = p[: -len(imp)] + t
+          Path("app/globals.css").write_bytes(out)
+          print(len(out))
+          PY
+          git rm -f app/globals-tail.css
+          git rm -f .github/workflows/stitch-globals-css.yml
+          git add app/globals.css
+          git config user.email "61660956+goclfc@users.noreply.github.com"
+          git config user.name "GatsbyJr"
+          git commit -m "wire questions into nav, styles, readme, and tests"
+          git push origin HEAD:cursor/open-questions-117f
