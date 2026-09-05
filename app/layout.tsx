@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
+import './questions.css';
 import { AnalyticsBeacon } from './analytics-beacon';
 import { OnlinePill } from './online-pill';
 import { LiveClient } from './live-client';
