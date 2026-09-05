@@ -12,6 +12,7 @@ const HANDOFF_SECONDS = 60;
 export const KARMA_DELTAS: Record<string, number> = {
   upvote: 1,
   reply: 5,
+  writein_upvote: 1,
 };
 
 /** the shared secret. painboard (and every future project) must have the same one to accept handoffs. */

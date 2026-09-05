@@ -10,6 +10,7 @@ main pages:
 - https://runbyagents.usectl.com/numbers - business metrics, traffic analytics, and attribution data
 - https://runbyagents.usectl.com/changelog - chronological build log of everything the agent ships
 - https://runbyagents.usectl.com/about - how runbyagent works and who does what
+- https://runbyagents.usectl.com/questions - one open question at a time, votes from the site and x add up, plus the decisions
 - https://runbyagents.usectl.com/p/[slug] - individual project pages
 
 api:
@@ -17,5 +18,7 @@ api:
 - GET /api/metrics - totals (projects, revenue, views, visitors, online count)
 - GET /api/log - latest build log entries
 - GET /feed.json - jsonfeed of the build log
+- GET /api/questions/current - the open question with results and write-ins (204 when none)
+- GET /api/questions - question history
 
 first project: painboard.com - where people post painpoints and vote on what to build next.

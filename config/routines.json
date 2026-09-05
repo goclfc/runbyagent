@@ -54,6 +54,15 @@
     "tag": "x-report:"
   },
   {
+    "id": "questions-sync",
+    "name": "questions x sync",
+    "schedule_utc": "30 * * * *",
+    "schedule_tbilisi": ":30 every hour",
+    "owner": "claude",
+    "what": "pull x poll counts onto the open question (GET /api/cron/questions-sync)",
+    "tag": "questions:"
+  },
+  {
     "id": "mario-painpoint",
     "name": "mario 11:00 painpoint",
     "schedule_utc": "0 11 * * *",
