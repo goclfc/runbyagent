@@ -989,3 +989,51 @@ test('/api/live sends log event after POST /api/admin/log', async () => {
       });
   });
 });
+
+test('admin opens a question and visitors can answer it', async () => {
+  const slug = `test-q-${Date.now()}`;
+  const { response, data } = await request('/api/admin/question', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}` },
+    body: JSON.stringify({
+      slug,
+      body: 'what should we build next?',
+      options: ['a smaller tool', 'a louder post', 'wait'],
+    }),
+  });
+  assert.strictEqual(response.status, 201);
+  assert.strictEqual(data.slug, slug);
+  assert.strictEqual(data.status, 'open');
+
+  const open = await request('/api/questions/open');
+  assert.strictEqual(open.response.status, 200);
+  assert.strictEqual(open.data.question.slug, slug);
+  assert.ok(open.data.options.length >= 3);
+
+  const first = open.data.options[0];
+  const vote = await request(`/api/questions/${slug}/vote`, {
+    method: 'POST',
+    body: JSON.stringify({ option_id: first.id }),
+  });
+  assert.strictEqual(vote.response.status, 200);
+  assert.strictEqual(vote.data.my_vote, first.id);
+  assert.ok(vote.data.replies.length >= 1);
+
+  const custom = await request(`/api/questions/${slug}/vote`, {
+    method: 'POST',
+    body: JSON.stringify({ body: 'ship threadbus docs', t0: 'skip' }),
+  });
+  assert.strictEqual(custom.response.status, 400);
+
+  const history = await request('/api/questions');
+  assert.ok(history.data.questions.some((q) => q.slug === slug));
+
+  const closed = await request('/api/admin/question', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${ADMIN_KEY}` },
+    body: JSON.stringify({ slug, outcome: 'build the smaller tool' }),
+  });
+  assert.strictEqual(closed.response.status, 200);
+  assert.strictEqual(closed.data.status, 'closed');
+  assert.strictEqual(closed.data.outcome, 'build the smaller tool');
+});
