@@ -3,9 +3,11 @@ import { formatDateMonthDayTbilisi, formatTimeTbilisi, formatDateShortTbilisi } 
 import { formatCents } from '@/lib/format';
 import { getLeaderboard, LeaderboardRow } from '@/lib/karma';
 import { getSessionUser, SessionUser } from '@/lib/auth';
+import { getOpenQuestion, getQuestionDetail, getLastDecided, firstChars, QuestionDetail, Question } from '@/lib/questions';
 import { DashboardStats } from './dashboard-stats';
 import { ProjectLiveMetrics } from './project-live-metrics';
 import { ProjectLink } from './project-link';
+import { QuestionPoll } from './questions/question-poll';
 
 const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
 
@@ -46,9 +48,12 @@ export default async function Home() {
   let library: LibraryRow[] = [];
   let users: LeaderboardRow[] = [];
   let me: SessionUser | null = null;
+  let openQuestion: QuestionDetail | null = null;
+  let lastDecided: Question | null = null;
 
   try {
-    [projects, changelog, library, users, me] = await Promise.all([
+    let open: Question | null = null;
+    [projects, changelog, library, users, me, open] = await Promise.all([
       query<ProjectRow>(`
         SELECT
           p.id, p.slug, p.name, p.status, p.url, p.metrics_url,
@@ -74,7 +79,13 @@ export default async function Home() {
       `),
       getLeaderboard(5),
       getSessionUser(),
+      getOpenQuestion(),
     ]);
+    if (open) {
+      openQuestion = await getQuestionDetail(open, me?.id);
+    } else {
+      lastDecided = await getLastDecided();
+    }
   } catch (error) {
     console.error('Error loading home page:', error);
   }
@@ -144,6 +155,34 @@ export default async function Home() {
         <p className="tile-note">
           online and views today come from each project&apos;s own /api/metrics. a dash means the project does not report them yet. revenue is stripe, tagged by project.
         </p>
+      </section>
+
+      <section className="bento-tile home-question" id="question">
+        <div className="tile-label">{openQuestion ? 'open question' : 'last question'}</div>
+        {openQuestion ? (
+          <>
+            <h2 className="home-question-title">
+              <a href={`/questions/${openQuestion.question.slug}`}>{openQuestion.question.title}</a>
+            </h2>
+            <QuestionPoll detail={openQuestion} loggedIn={Boolean(me)} compact />
+          </>
+        ) : lastDecided ? (
+          <>
+            <h2 className="home-question-title">
+              <a href={`/questions/${lastDecided.slug}`}>{lastDecided.title}</a>
+            </h2>
+            <p className="home-question-decided">
+              <span className="chip chip-decided">decided</span>
+              {lastDecided.decision_md ? firstChars(lastDecided.decision_md, 160) : ''}
+            </p>
+            <a href={`/questions/${lastDecided.slug}#decision`} className="more-link">read the decision →</a>
+          </>
+        ) : (
+          <>
+            <p className="tile-note">No question is open. When the agent hits a real fork in the road, it asks here and on X, and the votes add up.</p>
+            <a href="/questions" className="more-link">how questions work →</a>
+          </>
+        )}
       </section>
 
       <section className="bento-tile home-log">
