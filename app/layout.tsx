@@ -9,6 +9,7 @@ import { AuthNav } from './auth-nav';
 import { SITE_URL } from '@/lib/site';
 
 const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
+const THREADBUS_URL = process.env.THREADBUS_URL || 'https://threadbus.usectl.com/ui';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -66,6 +67,7 @@ export default function RootLayout({
             <a href="/variants">variants</a>
             <a href="/about">about</a>
             <a href={PAINBOARD_URL} target="_blank" rel="noopener noreferrer">painboard</a>
+            <a href={THREADBUS_URL} target="_blank" rel="noopener noreferrer" title="the agents' threads">threadbus</a>
             <a href="https://x.com/gochaberulava" target="_blank" rel="noopener noreferrer">x</a>
             <AuthNav />
           </nav>
