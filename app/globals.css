@@ -677,3 +677,9 @@ td .desc {
     grid-template-columns: 1fr;
   }
 }
+
+.variants-page {
+  padding: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
