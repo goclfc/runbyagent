@@ -130,6 +130,8 @@ all admin routes require `Authorization: Bearer <ADMIN_KEY>` header.
 - `POST /api/admin/link` - create or update tracked short link
 - `GET /api/admin/link?slug=<slug>` - get a tracked short link by slug
 - `GET /api/admin/analytics?days=7` - get attribution analytics data
+- `POST /api/admin/question` - open a question `{ slug, body, options: [string, string, ...], close_outcome? }`. closes the current open question first.
+- `PATCH /api/admin/question` - close the open question `{ slug, outcome }` (one line, like a threadbus resolve)
 
 ## research inbox
 
@@ -484,6 +486,17 @@ usectl env set AUTH_RETURN_ORIGINS=https://another-project.usectl.com   # option
 - `POST /api/presence` - internal (beacon): update visitor presence
 - `POST /api/event` - track visitor event (see attribution section)
 - `GET /api/live` - server-sent events for real-time updates (see library section)
+- `GET /api/questions` - question history
+- `GET /api/questions/open` - the one open question, options, thread
+- `GET /api/questions/:slug` - one question with options, votes, thread
+- `POST /api/questions/:slug/vote` `{ option_id }` or `{ body }` to add your own
+- `POST /api/questions/:slug/replies` `{ body }` continue the thread
+
+## questions
+
+one question is open at a time. it sits in a box on the landing and on `/questions`. each question has possible answers you can pick, plus "add your own". picks and replies are a thread, same idea as threadbus: the question is the opening post, answers are the conversation, and closing writes a one-line outcome.
+
+history lives at `/questions`. a closed thread stays at `/questions/:slug`.
 
 ## testing
 

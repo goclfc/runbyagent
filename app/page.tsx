@@ -3,9 +3,13 @@ import { formatDateMonthDayTbilisi, formatTimeTbilisi, formatDateShortTbilisi } 
 import { formatCents } from '@/lib/format';
 import { getLeaderboard, LeaderboardRow } from '@/lib/karma';
 import { getSessionUser, SessionUser } from '@/lib/auth';
+import { createDwellTimeToken } from '@/lib/rate-limit';
+import { getVisitorId } from '@/lib/visitor';
+import { getOpenQuestion, getOptions, getReplies, getMyVote } from '@/lib/questions';
 import { DashboardStats } from './dashboard-stats';
 import { ProjectLiveMetrics } from './project-live-metrics';
 import { ProjectLink } from './project-link';
+import { QuestionBox } from './questions/question-box';
 
 const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
 
@@ -46,9 +50,15 @@ export default async function Home() {
   let library: LibraryRow[] = [];
   let users: LeaderboardRow[] = [];
   let me: SessionUser | null = null;
+  let openQuestion = null as Awaited<ReturnType<typeof getOpenQuestion>>;
+  let openOptions = [] as Awaited<ReturnType<typeof getOptions>>;
+  let openReplies = [] as Awaited<ReturnType<typeof getReplies>>;
+  let myQuestionVote: number | null = null;
+  const dwell = createDwellTimeToken();
+  const visitorId = await getVisitorId();
 
   try {
-    [projects, changelog, library, users, me] = await Promise.all([
+    [projects, changelog, library, users, me, openQuestion] = await Promise.all([
       query<ProjectRow>(`
         SELECT
           p.id, p.slug, p.name, p.status, p.url, p.metrics_url,
@@ -74,7 +84,15 @@ export default async function Home() {
       `),
       getLeaderboard(5),
       getSessionUser(),
+      getOpenQuestion(),
     ]);
+    if (openQuestion) {
+      [openOptions, openReplies, myQuestionVote] = await Promise.all([
+        getOptions(openQuestion.id),
+        getReplies(openQuestion.id),
+        getMyVote(openQuestion.id, visitorId),
+      ]);
+    }
   } catch (error) {
     console.error('Error loading home page:', error);
   }
@@ -104,6 +122,24 @@ export default async function Home() {
 
       <section className="home-stats" aria-label="totals">
         <DashboardStats />
+      </section>
+
+      <section className="bento-tile home-question" id="question">
+        <div className="tile-label">open question</div>
+        {openQuestion ? (
+          <QuestionBox
+            question={openQuestion}
+            options={openOptions}
+            replies={openReplies}
+            myVote={myQuestionVote}
+            dwellToken={dwell.token}
+            compact
+            loggedIn={Boolean(me)}
+          />
+        ) : (
+          <p className="tile-note">no open question right now. <a href="/questions">see the history</a>.</p>
+        )}
+        <a href="/questions" className="more-link">all questions →</a>
       </section>
 
       <section className="bento-tile home-board" id="board">
