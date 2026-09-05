@@ -97,6 +97,7 @@ set up daily cron jobs for:
 
 - `POST /api/cron/stripe` - syncs revenue from stripe (last 35 days)
 - `POST /api/cron/metrics` - fetches metrics from all projects
+- `GET /api/cron/questions-sync` - pulls x poll counts onto the open question (hourly, needs `X_BEARER_TOKEN`)
 
 both routes require `Authorization: Bearer <CRON_SECRET>` header.
 
@@ -130,6 +131,14 @@ all admin routes require `Authorization: Bearer <ADMIN_KEY>` header.
 - `POST /api/admin/link` - create or update tracked short link
 - `GET /api/admin/link?slug=<slug>` - get a tracked short link by slug
 - `GET /api/admin/analytics?days=7` - get attribution analytics data
+- `POST /api/admin/questions` - open a question `{ title, slug?, context_md?, options: [2..4 labels], closes_in_hours? (24..168, default 48), x_post_url? }`. 409 while another one is open.
+- `GET /api/admin/questions` - every question with vote and write-in counts
+- `GET /api/admin/questions/:id` - one question (numeric id or slug) with results and write-ins
+- `PATCH /api/admin/questions/:id` - edit `{ title?, context_md?, options?, closes_in_hours?, x_post_url?, close?: true, reopen?: true }`. options can be renamed or added while open, never removed.
+- `POST /api/admin/questions/:id/decide` - `{ decision_md, author?, x_url? }` marks it decided and posts a `decision` entry to the changelog
+- `POST /api/admin/questions/:id/promote` - `{ writein_id, label? }` turns a write-in into a site-only option (max 4)
+- `POST /api/admin/questions/:id/sync-x` - pull poll counts from x. send `{ poll: { options: [{ position, label, votes }] } }` to write counts by hand.
+- `GET /api/admin/questions/:id/results` - per option site votes, x votes, total and share
 
 ## research inbox
 
@@ -484,6 +493,26 @@ usectl env set AUTH_RETURN_ORIGINS=https://another-project.usectl.com   # option
 - `POST /api/presence` - internal (beacon): update visitor presence
 - `POST /api/event` - track visitor event (see attribution section)
 - `GET /api/live` - server-sent events for real-time updates (see library section)
+- `GET /api/questions` - question history
+- `GET /api/questions/current` - the open question with results and write-ins, 204 when nothing is open
+- `GET /api/questions/:slug` - one question with results, write-ins and your vote
+- `POST /api/questions/:slug/vote` `{ option_id }` - login required, one vote per user, voting again moves it
+- `POST /api/questions/:slug/writeins` `{ body }` - login required, 200 characters, add your own answer
+- `POST /api/questions/:slug/writeins/:id/upvote` - login required, once per user, the author earns a karma point
+
+## questions
+
+one question is open at a time. it sits in a tile on the landing page and at `/questions`, with 2 to 4 options. logged in users vote on the site; the same question goes out as a poll on x and the counts add up, so every option shows `site + x` votes and a share. a question closes on its own after `closes_in_hours` (default 48).
+
+anyone logged in can add their own answer (a write-in, 200 characters). write-ins collect karma upvotes (kind `writein_upvote`, 1 point to the author). the agent can promote a write-in into a fourth option while the question is open; promoted options are site-only because x polls cannot grow.
+
+when it closes, gocha and the agent write the decision (`decide`). that marks the question decided and posts a `decision` entry to the changelog: `decision: <title> — <first 200 chars>`, followed by per-option totals and the top write-in authors. `/questions/:slug` shows the results, the write-ins and the decision, and links to the changelog entry.
+
+x sync: set `X_BEARER_TOKEN` and link the poll post with `x_post_url`. `GET /api/cron/questions-sync` (hourly, in `config/routines.json`) pulls the poll counts onto the options. without a token, or when the api is down, post the counts by hand to `sync-x` with a `poll` body.
+
+```bash
+usectl env set X_BEARER_TOKEN=...   # optional, for the hourly poll sync
+```
 
 ## testing
 
