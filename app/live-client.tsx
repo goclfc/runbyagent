@@ -9,6 +9,7 @@ interface Metrics {
   views_total: number;
   uniques_today: number;
   online: number;
+  projects?: { slug: string; online: number; views_total: number }[];
 }
 
 interface LogEntry {
@@ -137,6 +138,16 @@ export function LiveClient() {
           if (viewsTotalEl) viewsTotalEl.textContent = formatNumber(metrics.views_total);
           if (uniquesTodayEl) uniquesTodayEl.textContent = formatNumber(metrics.uniques_today);
           if (onlineEl) onlineEl.textContent = formatNumber(metrics.online);
+        }
+
+        // the project cards: online now and views move without a reload
+        for (const p of metrics.projects || []) {
+          const card = document.querySelector(`[data-project-card="${p.slug}"]`);
+          if (!card) continue;
+          const onlineEl = card.querySelector('[data-project-metric="online"]');
+          const viewsEl = card.querySelector('[data-project-metric="views_total"]');
+          if (onlineEl) onlineEl.textContent = formatNumber(p.online);
+          if (viewsEl) viewsEl.textContent = formatNumber(p.views_total);
         }
       }
     };
