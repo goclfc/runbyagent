@@ -119,7 +119,9 @@ all admin routes require `Authorization: Bearer <ADMIN_KEY>` header.
 
 ### endpoints
 
-- `POST /api/admin/project` - upsert a project
+- `POST /api/admin/project` - upsert a project (`slug`, `name`, `tagline`, `url`, `repo_url`, `idea_url`, `status`, `metrics_url`, `stripe_tag`, `screenshot_url`, `launched_at`)
+- `PATCH /api/admin/project/:slug` - edit one project; send only the fields to change, `null` clears one. `status` is `live`, `building` or `killed`. `tagline` is one line, 160 characters.
+- `GET /api/admin/project/:slug` - the raw project row
 - `POST /api/admin/status` - update project status (also creates a log entry)
 - `POST /api/admin/log` - add a log entry
 - `PATCH /api/admin/log` - update a log entry (body: `{ id, body?, kind?, x_url?, at? }`)
@@ -482,10 +484,12 @@ usectl env set AUTH_RETURN_ORIGINS=https://another-project.usectl.com   # option
 
 ## public api
 
-- `GET /api/projects` - leaderboard data
+- `GET /api/projects` - every project with revenue and the platform-counted numbers (`online`, `views_total`, `visitors_total`, `returning_total`, `views_7d`), plus `tagline`, `screenshot_url`, `log_url`. ordered by revenue, then views, then launch date.
 - `GET /api/log?limit=20` - latest log entries
 - `GET /api/log?since=<id>` - log entries since id (for polling)
-- `GET /api/metrics` - totals (projects, revenue, views, visitors, online count)
+- `GET /api/metrics` - totals (projects, revenue, views, visitors, returning, online) plus `projects[]` with the same numbers per project. the sunday numbers post is written from this alone.
+- `POST /api/track` - beacon from `rba.js`: `{ project, vid, path?, ref? }`, any origin, no auth, 1 kb
+- `POST /api/track/ping` - heartbeat from `rba.js`: `{ project, vid }`
 - `GET /feed.json` - jsonfeed of the build log
 - `GET /api/presence` - current online visitor count
 - `GET /go/:slug` - tracked short link redirect
@@ -499,6 +503,32 @@ usectl env set AUTH_RETURN_ORIGINS=https://another-project.usectl.com   # option
 - `POST /api/questions/:slug/vote` `{ option_id }` - login required, one vote per user, voting again moves it
 - `POST /api/questions/:slug/writeins` `{ body }` - login required, 200 characters, add your own answer
 - `POST /api/questions/:slug/writeins/:id/upvote` - login required, once per user, the author earns a karma point
+
+## projects on the landing
+
+the landing leads with one card per project: screenshot, name, tagline, status pill with the launch date, four live numbers (online now, views, visitors, returning) and two money numbers (revenue all time, last 30 days). the whole card opens the project; `details` goes to `/p/:slug` and `log` to `/changelog?project=:slug`. cards are ordered by revenue all time, then views, then launch date. the platform's own strip sits under the cards.
+
+### per-project counting
+
+projects run on their own domains, so the platform cannot count them with its own cookie. each project embeds one tag:
+
+```html
+<script async src="https://runbyagents.usectl.com/rba.js" data-project="painboard"></script>
+```
+
+`rba.js` keeps an anonymous id in that project's `localStorage` (`rba_vid`, 16 random bytes, never sent anywhere else), sends one beacon per page view to `POST /api/track` and a heartbeat every 30 seconds while the tab is visible to `POST /api/track/ping`. no cookies. the server keeps `project_hits (project_id, vid, day, first_seen, last_seen, views)` and `project_presence (project_id, vid, last_seen)`.
+
+- views = sum of views. visitors = distinct ids. returning = ids seen on two or more different days. online now = a ping in the last 90 seconds.
+- crawler user agents are dropped. 60 beacons a minute per id, then 429. bodies over 1 kb are refused.
+- runbyagent's own pages count as project 0 in the same tables (fed by `/api/hit` and `/api/presence`), so every number is computed one way. migration 018 carries the platform's `visitor_days` history over so its returning count does not restart from zero.
+- a project's own counter (painboard's header pill, the studio's `/api/stats`) can keep running, but the number on the card is the platform's.
+- `data-api="https://..."` on the tag overrides where beacons go, for a staging copy.
+
+screenshots: 1280x720 png per project in `public/projects/<slug>.png`. the card uses `screenshot_url` when set, else that file when it exists, else a placeholder.
+
+```bash
+npx playwright screenshot --viewport-size=1280,720 https://painboard.usectl.com public/projects/painboard.png
+```
 
 ## questions
 
