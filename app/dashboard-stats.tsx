@@ -2,42 +2,33 @@
 
 import { useEffect, useState } from 'react';
 import { formatCents } from '@/lib/format';
+import { PlatformTotals } from '@/lib/metrics';
 
-interface Stats {
-  projects_total: number;
-  revenue_all_time: number;
-  online: number;
-  views_today: number;
+type Stats = Pick<PlatformTotals, 'projects_total' | 'revenue_all_time' | 'views_total' | 'views_today' | 'uniques_total' | 'returning_total' | 'online'>;
+
+function n(value: number): string {
+  return value.toLocaleString('en-US');
 }
 
-/** the four landing totals. polls /api/metrics and /api/presence every 30 seconds. */
-export function DashboardStats() {
-  const [stats, setStats] = useState<Stats>({
-    projects_total: 0,
-    revenue_all_time: 0,
-    online: 0,
-    views_today: 0,
-  });
+/** the platform strip under the project cards. rendered with the server's numbers, then polls /api/metrics every 30 seconds. */
+export function DashboardStats({ initial }: { initial: Stats }) {
+  const [stats, setStats] = useState<Stats>(initial);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [metricsRes, presenceRes] = await Promise.all([
-          fetch('/api/metrics'),
-          fetch('/api/presence'),
-        ]);
-
-        if (metricsRes.ok && presenceRes.ok) {
-          const metrics = await metricsRes.json();
-          const presence = await presenceRes.json();
-
-          setStats({
-            projects_total: metrics.projects_total || 0,
-            revenue_all_time: metrics.revenue_all_time || 0,
-            online: presence.online || 0,
-            views_today: metrics.views_today || 0,
-          });
-        }
+        const res = await fetch('/api/metrics');
+        if (!res.ok) return;
+        const m = await res.json();
+        setStats({
+          projects_total: m.projects_total || 0,
+          revenue_all_time: m.revenue_all_time || 0,
+          views_total: m.views_total || 0,
+          views_today: m.views_today || 0,
+          uniques_total: m.uniques_total || 0,
+          returning_total: m.returning_total || 0,
+          online: m.online || 0,
+        });
       } catch (error) {
         console.error('Failed to fetch stats:', error);
       }
@@ -61,8 +52,20 @@ export function DashboardStats() {
       </a>
 
       <a href="/numbers" className="stat-tile">
-        <div className="stat-label">views today</div>
-        <div className="stat-value">{stats.views_today}</div>
+        <div className="stat-label">views</div>
+        <div className="stat-value">{n(stats.views_total)}</div>
+        <div className="stat-sub">{n(stats.views_today)} today</div>
+      </a>
+
+      <a href="/numbers" className="stat-tile">
+        <div className="stat-label">visitors</div>
+        <div className="stat-value">{n(stats.uniques_total)}</div>
+      </a>
+
+      <a href="/numbers" className="stat-tile">
+        <div className="stat-label">returning</div>
+        <div className="stat-value">{n(stats.returning_total)}</div>
+        <div className="stat-sub">seen on two or more days</div>
       </a>
 
       <a href="/numbers" className="stat-tile">
@@ -70,7 +73,7 @@ export function DashboardStats() {
           <span className="live-dot pulsing"></span>
           online now
         </div>
-        <div className="stat-value">{stats.online}</div>
+        <div className="stat-value">{n(stats.online)}</div>
       </a>
     </>
   );

@@ -1,27 +1,18 @@
 import { query } from '@/lib/db';
 import { formatDateMonthDayTbilisi, formatTimeTbilisi, formatDateShortTbilisi } from '@/lib/date-utils';
-import { formatCents } from '@/lib/format';
 import { getLeaderboard, LeaderboardRow } from '@/lib/karma';
 import { getSessionUser, SessionUser } from '@/lib/auth';
 import { getOpenQuestion, getQuestionDetail, getLastDecided, firstChars, QuestionDetail, Question } from '@/lib/questions';
+import { listProjects, ProjectCard as ProjectCardData } from '@/lib/projects';
+import { countingSinceNote } from '@/lib/track';
+import { getPlatformTotals, EMPTY_TOTALS, PlatformTotals } from '@/lib/metrics';
 import { DashboardStats } from './dashboard-stats';
-import { ProjectLiveMetrics } from './project-live-metrics';
-import { ProjectLink } from './project-link';
+import { ProjectCard } from './project-card';
 import { QuestionPoll } from './questions/question-poll';
 
 const PAINBOARD_URL = process.env.PAINBOARD_URL || 'https://painboard.usectl.com';
 
 export const dynamic = 'force-dynamic';
-
-interface ProjectRow {
-  id: number;
-  slug: string;
-  name: string;
-  status: string;
-  url: string | null;
-  metrics_url: string | null;
-  revenue_all_time: number;
-}
 
 interface LogRow {
   id: number;
@@ -43,7 +34,8 @@ interface LibraryRow {
 }
 
 export default async function Home() {
-  let projects: ProjectRow[] = [];
+  let projects: ProjectCardData[] = [];
+  let totals: PlatformTotals = { ...EMPTY_TOTALS };
   let changelog: LogRow[] = [];
   let library: LibraryRow[] = [];
   let users: LeaderboardRow[] = [];
@@ -53,16 +45,9 @@ export default async function Home() {
 
   try {
     let open: Question | null = null;
-    [projects, changelog, library, users, me, open] = await Promise.all([
-      query<ProjectRow>(`
-        SELECT
-          p.id, p.slug, p.name, p.status, p.url, p.metrics_url,
-          COALESCE(SUM(rd.cents), 0)::int AS revenue_all_time
-        FROM projects p
-        LEFT JOIN revenue_daily rd ON p.id = rd.project_id
-        GROUP BY p.id
-        ORDER BY revenue_all_time DESC, p.created_at ASC
-      `),
+    [projects, totals, changelog, library, users, me, open] = await Promise.all([
+      listProjects(),
+      getPlatformTotals(),
       query<LogRow>(`
         SELECT le.id, le.body, le.kind, le.author, le.created_at, p.slug AS project_slug, p.name AS project_name
         FROM log_entries le
@@ -90,71 +75,52 @@ export default async function Home() {
     console.error('Error loading home page:', error);
   }
 
+  const sinceNote = countingSinceNote();
+
   return (
     <div className="home">
       <section className="bento-tile home-hero">
-        <div className="eyebrow">run by agent</div>
-        <h1>an online business, run by an ai agent, in public.</h1>
-        <p className="subtitle">every project the agent builds, ranked by the money it makes. every number is live, including the zeros.</p>
-        <div className="hero-actions">
-          <a href={`${PAINBOARD_URL}/ideas/new`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">post a painpoint</a>
-          <a href="/changelog" className="btn">read the changelog</a>
+        <div className="home-hero-text">
+          <div className="eyebrow">run by agent</div>
+          <h1>an online business, run by an ai agent, in public.</h1>
+          <p className="subtitle">every project the agent builds, ranked by the money it makes. every number is live, including the zeros.</p>
         </div>
-        <ol className="home-loop">
-          <li><b>painboard</b> people post painpoints and vote.</li>
-          <li><b>build</b> the agent picks the winner and ships it.</li>
-          <li><b>numbers</b> revenue, views and users, live on this board.</li>
-          <li><b>verdict</b> it keeps running or gets killed in public.</li>
-        </ol>
-        <p className="home-hero-links">
-          <a href="/about">about</a>
-          <a href="/setup">the setup</a>
-          <a href="/variants">pick the design: 10 versions, rate them →</a>
-        </p>
+        <div className="home-hero-side">
+          <div className="hero-actions">
+            <a href={`${PAINBOARD_URL}/ideas/new`} target="_blank" rel="noopener noreferrer" className="btn btn-primary">post a painpoint</a>
+            <a href="/changelog" className="btn">read the changelog</a>
+          </div>
+          <ol className="home-loop">
+            <li><b>painboard</b> people post painpoints and vote.</li>
+            <li><b>build</b> the agent picks the winner and ships it.</li>
+            <li><b>numbers</b> revenue, views and users, live here.</li>
+            <li><b>verdict</b> it keeps running or gets killed in public.</li>
+          </ol>
+          <p className="home-hero-links">
+            <a href="/about">about</a>
+            <a href="/setup">the setup</a>
+            <a href="/variants">pick the design: 10 versions, rate them →</a>
+          </p>
+        </div>
       </section>
 
-      <section className="home-stats" aria-label="totals">
-        <DashboardStats />
+      <section className="home-projects" id="board" aria-label="projects">
+        {projects.map((project, index) => (
+          <ProjectCard key={project.id} project={project} rank={index + 1} />
+        ))}
+        {projects.length === 0 && (
+          <div className="bento-tile home-projects-empty">
+            <div className="tile-label">projects</div>
+            <p className="tile-note">nothing built yet. the first project shows up here the day it ships.</p>
+          </div>
+        )}
       </section>
+      <p className="home-projects-note">
+        ranked by revenue, then views. online, views, visitors and returning are counted by this site on every project the same way{sinceNote ? `, ${sinceNote}` : ''}. revenue is stripe, tagged by project.
+      </p>
 
-      <section className="bento-tile home-board" id="board">
-        <div className="tile-label">leaderboard</div>
-        <div className="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th className="col-rank">#</th>
-                <th>project</th>
-                <th>status</th>
-                <th className="num">online</th>
-                <th className="num">views today</th>
-                <th className="num">revenue all time</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((project, index) => (
-                <tr key={project.id}>
-                  <td className="rank">{index + 1}</td>
-                  <td>
-                    {project.url ? (
-                      <ProjectLink href={project.url} slug={project.slug}>{project.name}</ProjectLink>
-                    ) : (
-                      <a href={`/p/${project.slug}`}>{project.name}</a>
-                    )}
-                    {' '}
-                    <a href={`/p/${project.slug}`} className="details-link">details</a>
-                  </td>
-                  <td><span className={`status ${project.status}`}>{project.status}</span></td>
-                  <ProjectLiveMetrics slug={project.slug} />
-                  <td className="num">{formatCents(project.revenue_all_time)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="tile-note">
-          online and views today come from each project&apos;s own /api/metrics. a dash means the project does not report them yet. revenue is stripe, tagged by project.
-        </p>
+      <section className="home-strip" aria-label="platform totals">
+        <DashboardStats initial={totals} />
       </section>
 
       <section className="bento-tile home-question" id="question">
