@@ -1,28 +1,5 @@
-/* questions: the landing tile slot, the poll, history and the question page.
-   loaded after globals.css, so the .home grid overrides below win. */
-
-.home {
-  grid-template-areas:
-    "hero hero hero hero hero stats stats stats stats stats stats stats"
-    "hero hero hero hero hero board board board board board board board"
-    "question question question question question question question question question question question question"
-    "log log log log log log library library library users users users";
-}
-
-.home-question { grid-area: question; }
-
-@media (max-width: 1023px) {
-  .home {
-    grid-template-areas:
-      "hero"
-      "stats"
-      "board"
-      "question"
-      "log"
-      "library"
-      "users";
-  }
-}
+/* questions: the poll, history and the question page. the landing grid slot for
+   .home-question lives in projects.css, which lays out the whole landing. */
 
 .home-question-title {
   margin: 0 0 14px;
