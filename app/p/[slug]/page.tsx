@@ -1,7 +1,8 @@
 import { query } from '@/lib/db';
 import { notFound } from 'next/navigation';
 import { formatDateShortTbilisi } from '@/lib/date-utils';
-import { ProjectLiveStats } from '@/app/project-live-metrics';
+import { getProjectStats, ProjectStats, EMPTY_STATS, countingSinceNote } from '@/lib/track';
+import { SITE_URL } from '@/lib/site';
 import { ProjectLink } from '@/app/project-link';
 
 export const dynamic = 'force-dynamic';
@@ -21,6 +22,7 @@ export default async function ProjectPage({ params }: PageProps) {
   let revenue30d: any[] = [];
   let metrics: any[] = [];
   let logEntries: any[] = [];
+  let stats: ProjectStats = { ...EMPTY_STATS };
 
   try {
     const projectResult = await query(`
@@ -65,12 +67,15 @@ export default async function ProjectPage({ params }: PageProps) {
       WHERE project_id = $1
       ORDER BY created_at DESC
     `, [project.id]);
+
+    stats = await getProjectStats(project.id);
   } catch (error) {
     console.error('Error loading project:', error);
     notFound();
   }
 
   const maxRevenue = Math.max(...revenue30d.map(d => d.cents), 1);
+  const sinceNote = countingSinceNote();
 
   return (
     <>
@@ -107,18 +112,30 @@ export default async function ProjectPage({ params }: PageProps) {
       <div className="section">
         <h2 className="section-title">numbers</h2>
         <div className="stats-grid">
-          <ProjectLiveStats slug={slug} />
           <div className="stat-tile">
-            <div className="stat-label">uniques total</div>
-            <div className="stat-value">
-              {metrics.find((m: any) => m.key === 'uniques_total')?.value?.toLocaleString() || '-'}
+            <div className="stat-label">
+              <span className="live-dot"></span>
+              online now
             </div>
+            <div className="stat-value">{stats.online.toLocaleString('en-US')}</div>
           </div>
           <div className="stat-tile">
-            <div className="stat-label">revenue all time</div>
-            <div className="stat-value">{formatCents(project.revenue_all_time)}</div>
+            <div className="stat-label">views</div>
+            <div className="stat-value">{stats.views_total.toLocaleString('en-US')}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="stat-label">visitors</div>
+            <div className="stat-value">{stats.visitors_total.toLocaleString('en-US')}</div>
+          </div>
+          <div className="stat-tile">
+            <div className="stat-label">returning</div>
+            <div className="stat-value">{stats.returning_total.toLocaleString('en-US')}</div>
           </div>
         </div>
+        <p className="project-numbers-note">
+          the same numbers as the card on the front page, counted by runbyagent through the script below{sinceNote ? `, ${sinceNote}` : ''}. returning means seen on two or more days. online now means a ping in the last 90 seconds.
+        </p>
+        <pre className="project-embed">{`<script async src="${SITE_URL}/rba.js" data-project="${project.slug}"></script>`}</pre>
         <div className="metrics-grid" style={{ marginTop: '24px' }}>
           <div className="metric">
             <div className="metric-label">revenue (all time)</div>

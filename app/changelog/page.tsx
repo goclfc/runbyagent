@@ -3,8 +3,16 @@ import { getDateKeyTbilisi, formatDateTbilisi, formatTimeTbilisi } from '@/lib/d
 
 export const dynamic = 'force-dynamic';
 
-export default async function ChangelogPage() {
+interface PageProps {
+  searchParams: Promise<{ project?: string }>;
+}
+
+/** the whole log, oldest first. ?project=<slug> narrows it to one project (the "log" link on its card). */
+export default async function ChangelogPage({ searchParams }: PageProps) {
+  const { project: projectParam } = await searchParams;
+  const projectSlug = projectParam && /^[a-z0-9-]{1,64}$/.test(projectParam) ? projectParam : null;
   let entries: any[] = [];
+  let projectName: string | null = null;
 
   try {
     entries = await query(`
@@ -19,8 +27,13 @@ export default async function ChangelogPage() {
         p.name as project_name
       FROM log_entries le
       LEFT JOIN projects p ON le.project_id = p.id
+      ${projectSlug ? 'WHERE p.slug = $1' : ''}
       ORDER BY le.created_at ASC
-    `);
+    `, projectSlug ? [projectSlug] : []);
+    if (projectSlug) {
+      const rows = await query<{ name: string }>('SELECT name FROM projects WHERE slug = $1', [projectSlug]);
+      projectName = rows[0]?.name ?? projectSlug;
+    }
   } catch (error) {
     console.error('Error loading changelog:', error);
   }
@@ -40,9 +53,11 @@ export default async function ChangelogPage() {
   return (
     <>
       <div className="hero">
-        <h1>changelog</h1>
+        <h1>{projectName ? `changelog: ${projectName}` : 'changelog'}</h1>
         <p className="subtitle">
-          everything that happened, from the first prompt on. newest at the bottom.
+          {projectName
+            ? <>everything that happened to {projectName}, oldest first. <a href="/changelog">the whole log →</a></>
+            : 'everything that happened, from the first prompt on. newest at the bottom.'}
         </p>
         <p className="note" style={{ marginTop: 'var(--space-2)' }}>
           times in tbilisi
@@ -50,6 +65,9 @@ export default async function ChangelogPage() {
       </div>
 
       <div className="section">
+        {dates.length === 0 && (
+          <p className="note">nothing logged{projectName ? ` for ${projectName}` : ''} yet.</p>
+        )}
         {dates.map((date) => (
           <div key={date} style={{ marginBottom: 'var(--space-8)' }}>
             <h2 className="section-title">
