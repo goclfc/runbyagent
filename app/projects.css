@@ -1,0 +1,484 @@
+/* v0.9: projects front and centre. the landing leads with one card per project, the
+   platform strip sits underneath, questions and the changelog stay below the fold.
+   loaded after globals.css and questions.css, so the .home grid here wins. */
+
+.home {
+  grid-template-areas:
+    "hero hero hero hero hero hero hero hero hero hero hero hero"
+    "projects projects projects projects projects projects projects projects projects projects projects projects"
+    "note note note note note note note note note note note note"
+    "strip strip strip strip strip strip strip strip strip strip strip strip"
+    "question question question question question question question question question question question question"
+    "log log log log log log library library library users users users";
+  row-gap: 12px;
+}
+
+.home-projects { grid-area: projects; }
+.home-projects-note { grid-area: note; }
+.home-strip { grid-area: strip; }
+.home-question { grid-area: question; }
+
+/* ---- hero: one slim band, text left, actions and the loop right ---- */
+
+.home .home-hero {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 18px 22px;
+}
+
+.home-hero-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.home-hero h1 {
+  max-width: 28ch;
+  font-size: clamp(24px, 2.2vw, 32px);
+}
+
+.home-hero .subtitle {
+  font-size: 14px;
+  margin: 0;
+}
+
+.home-hero-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+  max-width: 46ch;
+}
+
+.home-hero-side .hero-actions {
+  margin: 0;
+  justify-content: flex-end;
+}
+
+.home-hero-side .home-loop {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 14px;
+  margin: 0;
+  padding: 0;
+  border-top: 0;
+  font-size: 12px;
+}
+
+.home-hero-side .home-loop li {
+  gap: 6px;
+}
+
+.home-hero-side .home-hero-links {
+  margin: 0;
+  padding: 0;
+  justify-content: flex-end;
+}
+
+/* ---- cards ---- */
+
+.home-projects {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.project-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.project-card:hover {
+  border-color: var(--line-2);
+  transform: translateY(-1px);
+}
+
+.project-card:has(.project-card-main:focus-visible) {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
+
+/* the name link stretches over the whole card; the small links stack above it */
+.project-card-main {
+  color: inherit;
+  text-decoration: none;
+}
+
+.project-card-main::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.project-card-main:focus-visible {
+  outline: none;
+}
+
+.project-card-minor {
+  position: relative;
+  z-index: 2;
+}
+
+.project-card-shot {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--tile-2);
+  border-bottom: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.project-card-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;
+}
+
+.project-card-shot-empty {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg, var(--tile-2) 0%, var(--tile) 100%);
+  background-size: 100% 100%;
+}
+
+.project-card-shot-empty::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  opacity: 0.5;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+.project-card-shot-empty span {
+  position: relative;
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.project-card-rank {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 8px;
+  backdrop-filter: blur(6px);
+}
+
+.project-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 14px;
+  flex: 1;
+}
+
+.project-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-card-name {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 650;
+}
+
+.project-card-tagline {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.project-card-status {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  min-height: 14px;
+}
+
+.project-card-live,
+.project-card-money {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.project-card-live {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 2px;
+}
+
+.project-card-money {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.project-card-live div,
+.project-card-money div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.project-card-live dt,
+.project-card-money dt {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.project-card-live dd,
+.project-card-money dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.project-card-money dd {
+  font-size: 16px;
+}
+
+.project-card-money dd.zero {
+  color: var(--muted);
+}
+
+.project-card-live .live-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.project-card-foot {
+  margin-top: auto;
+  padding-top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.project-card-open {
+  color: var(--lime);
+  margin-right: auto;
+}
+
+.project-card-minor {
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+.project-card-minor:hover {
+  color: var(--lime);
+}
+
+.project-card.is-killed {
+  opacity: 0.85;
+}
+
+.project-card.is-killed .project-card-shot img {
+  filter: grayscale(1);
+}
+
+.home-projects-empty {
+  grid-column: 1 / -1;
+}
+
+.home-projects-note {
+  margin: -2px 2px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* ---- the platform strip ---- */
+
+.home-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.home-strip .stat-tile {
+  grid-column: auto;
+  grid-row: auto;
+  background: var(--tile);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.home-strip .stat-tile:hover {
+  border-color: var(--line-2);
+}
+
+.home-strip .stat-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.home-strip .stat-value {
+  font-family: var(--mono);
+  font-size: clamp(20px, 1.8vw, 26px);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.home-strip .stat-value-zero {
+  color: var(--muted);
+}
+
+.home-strip .stat-sub {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ---- narrower screens ---- */
+
+@media (max-width: 1279px) {
+  .home-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  .home {
+    grid-template-areas:
+      "hero"
+      "projects"
+      "note"
+      "strip"
+      "question"
+      "log"
+      "library"
+      "users";
+  }
+
+  .home .home-hero {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .home-hero-side {
+    align-items: flex-start;
+    max-width: none;
+  }
+
+  .home-hero-side .hero-actions,
+  .home-hero-side .home-loop,
+  .home-hero-side .home-hero-links {
+    justify-content: flex-start;
+  }
+
+  .home-hero h1 {
+    font-size: clamp(24px, 6vw, 32px);
+  }
+}
+
+@media (max-width: 640px) {
+  .home-projects {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .project-card-live {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---- project page: the same numbers the card shows ---- */
+
+.project-numbers-note {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.project-embed {
+  margin-top: var(--space-4, 16px);
+  padding: 12px 14px;
+  background: var(--tile-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-2);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.status.building {
+  color: var(--text-2);
+  border-style: dashed;
+}
