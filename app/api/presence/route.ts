@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { PLATFORM_PROJECT_ID, recordPing } from '@/lib/track';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,8 @@ export async function POST(req: NextRequest) {
       'DELETE FROM presence WHERE last_seen < $1',
       [oneDayAgo]
     );
+    
+    await recordPing(PLATFORM_PROJECT_ID, visitorId);
     
     const response = NextResponse.json({ ok: true });
     

@@ -1,29 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { cookies } from 'next/headers';
+import { PLATFORM_PROJECT_ID, isBot, recordView } from '@/lib/track';
 
 export const dynamic = 'force-dynamic';
-
-const BOT_PATTERNS = [
-  'runbyagent-claude',
-  'bot',
-  'spider',
-  'crawler',
-  'scraper',
-  'googlebot',
-  'bingbot',
-  'slackbot',
-  'twitterbot',
-  'facebookexternalhit',
-  'linkedinbot',
-  'whatsapp',
-  'telegrambot',
-];
-
-function isBot(userAgent: string): boolean {
-  const ua = userAgent.toLowerCase();
-  return BOT_PATTERNS.some(pattern => ua.includes(pattern));
-}
 
 function getDevice(userAgent: string): string {
   const ua = userAgent.toLowerCase();
@@ -160,6 +140,9 @@ export async function POST(req: NextRequest) {
         [today, visitorId]
       );
     }
+    
+    // the same view, counted the way every project is counted (project 0 = this site)
+    await recordView(PLATFORM_PROJECT_ID, visitorId);
     
     const response = NextResponse.json({ ok: true });
     
