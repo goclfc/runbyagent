@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { query } from '@/lib/db';
+import { getLiveProjectNumbers } from '@/lib/track';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
           views_total: metricsResult[0]?.views_total || 0,
           uniques_today: metricsResult[0]?.uniques_today || 0,
           online: onlineResult[0]?.online || 0,
+          projects: await getLiveProjectNumbers(),
         };
 
         const snapshot = {
@@ -108,6 +110,7 @@ export async function GET(request: NextRequest) {
               views_total: currentMetricsResult[0]?.views_total || 0,
               uniques_today: currentMetricsResult[0]?.uniques_today || 0,
               online: currentOnlineResult[0]?.online || 0,
+              projects: await getLiveProjectNumbers(),
             };
 
             if (JSON.stringify(currentMetrics) !== JSON.stringify(lastMetrics)) {
